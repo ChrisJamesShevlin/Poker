@@ -110,3 +110,120 @@ def rule_of_2_and_4(outs, board_len):
     if board_len == 4:
         return min(outs * 2, 100) / 100, f"{outs} outs x 2 = ~{min(outs*2,100)}% (turn, one card to come)"
     return None
+
+
+# ---------- plain-English "what do I hold" ----------
+PLURAL = {"2": "Deuces", "3": "Threes", "4": "Fours", "5": "Fives", "6": "Sixes", "7": "Sevens",
+          "8": "Eights", "9": "Nines", "T": "Tens", "J": "Jacks", "Q": "Queens", "K": "Kings", "A": "Aces"}
+SINGLE = {k: v.capitalize() for k, v in NAMES.items()}
+
+
+def _straight_high(ranks):
+    """Highest straight top-rank (RANKS index) in a set of rank indexes, else None. Wheel = five high."""
+    s = set(ranks)
+    if 12 in s:
+        s.add(-1)
+    for top in range(12, 2, -1):
+        if all(top - i in s for i in range(5)):
+            return top
+    return None
+
+
+def made_hand_name(cards):
+    """Name of the best 5-card hand in `cards`, e.g. 'Flush, Ace high'."""
+    cat = CATS[_cat(cards)]
+    rk = [RANKS.index(c[0]) for c in cards]
+    cnt = Counter(rk)
+    byc = sorted(cnt.items(), key=lambda x: (x[1], x[0]), reverse=True)
+    name = lambda i: SINGLE[RANKS[i]]
+    plural = lambda i: PLURAL[RANKS[i]]
+    suits = Counter(c[1] for c in cards)
+    if cat == "Straight Flush":
+        fs = [s for s, n in suits.items() if n >= 5][0]
+        top = _straight_high([RANKS.index(c[0]) for c in cards if c[1] == fs])
+        return "Royal flush" if top == 12 else f"Straight flush, {name(top)} high"
+    if cat == "Quads":
+        return f"Four of a kind, {plural(byc[0][0])}"
+    if cat == "Full House":
+        trips = max(r for r, n in cnt.items() if n == 3)
+        pair = max(r for r, n in cnt.items() if n >= 2 and r != trips)
+        return f"Full house, {plural(trips)} full of {plural(pair)}"
+    if cat == "Flush":
+        fs = [s for s, n in suits.items() if n >= 5][0]
+        top = max(RANKS.index(c[0]) for c in cards if c[1] == fs)
+        return f"Flush, {name(top)} high"
+    if cat == "Straight":
+        top = _straight_high(rk)
+        return f"Straight, {'Five' if top == 3 else name(top)} high"
+    if cat == "Trips":
+        return f"Three of a kind, {plural(byc[0][0])}"
+    if cat == "Two Pair":
+        pairs = sorted((r for r, n in cnt.items() if n == 2), reverse=True)[:2]
+        return f"Two pair, {plural(pairs[0])} and {plural(pairs[1])}"
+    if cat == "Pair":
+        return f"Pair of {plural(byc[0][0])}"
+    return f"High card, {name(max(rk))}"
+
+
+def board_texture(board):
+    notes = []
+    suits = Counter(c[1] for c in board)
+    s, n = suits.most_common(1)[0]
+    sym = {"s": "spades", "h": "hearts", "d": "diamonds", "c": "clubs"}[s]
+    if n >= 5:
+        notes.append(f"5 {sym} on board - anyone can have a flush")
+    elif n == 4:
+        notes.append(f"4 {sym} on board - any {sym[:-1]} makes a flush")
+    elif n == 3:
+        notes.append(f"3 {sym} on board - flush possible")
+    cnt = Counter(c[0] for c in board)
+    top = cnt.most_common(1)[0][1]
+    if top >= 3:
+        notes.append("trips on board")
+    elif top == 2:
+        notes.append("paired board")
+    rk = sorted({RANKS.index(c[0]) for c in board} | ({-1} if "A" in cnt else set()))
+    for lo in range(-1, 9):
+        if sum(1 for r in rk if lo <= r <= lo + 4) >= 3:
+            notes.append("straight possible" if len(board) >= 3 else "")
+            break
+    return [x for x in notes if x]
+
+
+def hold_summary(hole, board):
+    """Everything for the 'You hold' panel."""
+    if not board:
+        return None
+    cards = hole + board
+    info = analyse(hole, board)
+    title = made_hand_name(cards)
+    if info["made"] == "Pair":
+        title += " - " + _pair_text(hole, board).split(" (")[0]
+    elif info["made"] == "Trips":
+        if hole[0][0] == hole[1][0]:
+            title += " (set)"
+    if len(board) == 5 and _cat(board) == _cat(cards) and \
+            eval7.evaluate([eval7.Card(c) for c in board]) == eval7.evaluate([eval7.Card(c) for c in cards]):
+        title += " - the board plays"
+    # rank against every possible two-card holding
+    dead = set(cards)
+    left = [c for c in FULL_DECK if c not in dead]
+    me = eval7.evaluate([eval7.Card(c) for c in cards])
+    bd = [eval7.Card(c) for c in board]
+    beat = tie = total = 0
+    best, best_cards = -1, None
+    for i in range(len(left)):
+        for j in range(i + 1, len(left)):
+            sc = eval7.evaluate([eval7.Card(left[i]), eval7.Card(left[j])] + bd)
+            total += 1
+            beat += me > sc
+            tie += me == sc
+            if sc > best:
+                best, best_cards = sc, [left[i], left[j]]
+    ahead = (beat + tie / 2) / total
+    if me >= best:
+        nuts = "You have the best possible hand right now."
+    else:
+        nuts = f"Best possible hand right now: {made_hand_name(best_cards + board)}."
+    return {"title": title, "draws": info["draws"], "outs": info["outs"],
+            "texture": board_texture(board), "ahead": ahead, "nuts": nuts}
