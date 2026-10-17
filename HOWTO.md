@@ -1,8 +1,12 @@
 # Commands
 
-Start GGPoker:
+Start GGPoker (via Proton):
 
     ~/.local/bin/gg-start.sh
+
+If it says "already running" but it isn't, clear the stale session first:
+
+    ~/.local/bin/gg-stop.sh && ~/.local/bin/gg-start.sh
 
 Start the study tool (opens http://127.0.0.1:5173):
 
