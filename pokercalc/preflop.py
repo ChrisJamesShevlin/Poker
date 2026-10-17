@@ -64,6 +64,11 @@ CALL = {
     "SB": expand("77-TT, ATs+, KQs, QJs, JTs, AQo"),
     "BB": expand("22-TT, A2s+, K5s+, Q7s+, J8s+, T8s+, 97s+, 86s+, 75s+, 65s, 54s, ATo+, KTo+, QTo+, JTo"),
 }
+# Facing a BIG raise (about 4-12bb, usually a 3-bet): re-raise only the top, call a tighter slice
+FOURBET = expand("QQ+, AKs, AKo")
+BIG_CONTINUE_PCT = {"UTG": 5, "HJ": 5, "CO": 6, "BTN": 7, "SB": 5, "BB": 8}   # top X% of hands
+# Facing a HUGE raise or shove (12bb+, or 40%+ of your stack): only the very top continues
+SHOVE_CALL = expand("QQ+, AKs, AKo")
 # Short stack (<15bb) push list as a % of hands (by strength); BB = calling a shove
 SHOVE = {"UTG": 10, "HJ": 13, "CO": 18, "BTN": 30, "SB": 40, "BB": 22}
 
@@ -113,7 +118,31 @@ def _trim(chart, bb):
     return set(order[: math.ceil(len(order) * 0.85)])
 
 
-def advise(hole, position, stack_bb, facing_raise):
+def raise_info(call, bb, stack, position):
+    """Works out the raise size from only 'bet to call'. Returns dict(raise_bb, tier, facing).
+
+    tier: 'none' (nothing to face), 'limp', 'normal' (<=4bb), 'big' (4-12bb), 'shove' (12bb+ or 40%+ of stack).
+    Blinds already posted are added back, since 'bet to call' only counts what you still owe.
+    """
+    if not call or call <= 0:
+        return {"raise_bb": None, "tier": "none", "facing": False}
+    posted = (bb if position == "BB" else bb / 2 if position == "SB" else 0) if bb else 0
+    raise_bb = (call + posted) / bb if bb else None
+    stack_share = call / stack if stack else None
+    if (raise_bb is not None and raise_bb >= 12) or (stack_share is not None and stack_share >= 0.4):
+        tier = "shove"
+    elif raise_bb is None:
+        tier = "normal"
+    elif raise_bb > 4:
+        tier = "big"
+    elif raise_bb > 1.05:
+        tier = "normal"
+    else:
+        tier = "limp"
+    return {"raise_bb": raise_bb, "tier": tier, "facing": tier in ("normal", "big", "shove")}
+
+
+def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=None):
     cls = hole_class(*hole)
     rank = ranking().index(cls) + 1
     pct = percentile(cls)
@@ -136,6 +165,20 @@ def advise(hole, position, stack_bb, facing_raise):
                 act, why = "RAISE", f"in the {position} open chart (~{share:.0f}% of hands)"
             else:
                 act, why = "FOLD", f"not in the {position} open chart (~{share:.0f}% of hands)"
+    elif size_tier == "shove":
+        size = f"raise of ~{raise_bb:.0f}bb" if raise_bb else "huge raise / shove"
+        if cls in SHOVE_CALL:
+            act, why = "CALL", f"{size}: only QQ+ and AK continue - this hand is in that group"
+        else:
+            act, why = "FOLD", f"{size}: only QQ+ and AK continue"
+    elif size_tier == "big":
+        size = f"big raise (~{raise_bb:.1f}bb)" if raise_bb else "big raise"
+        if cls in FOURBET:
+            act, why = "RAISE", f"{size}: premium - re-raise"
+        elif pct <= BIG_CONTINUE_PCT[position]:
+            act, why = "CALL", f"{size}: continue with the top ~{BIG_CONTINUE_PCT[position]}% of hands - this hand qualifies"
+        else:
+            act, why = "FOLD", f"{size}: outside the top ~{BIG_CONTINUE_PCT[position]}% you can continue with"
     else:
         call = _trim(CALL[position], stack_bb)
         if cls in THREE_BET:

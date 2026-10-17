@@ -164,3 +164,33 @@ def test_coach_prompt_and_runner(tmp_path):
         return Fake()
     ok, text = coach.run_coach("hi", runner=runner)
     assert ok and text.startswith("## Overall") and "--tools" in seen["cmd"] and seen["kw"]["input"] == "hi"
+
+
+def test_raise_info_tiers():
+    ri = preflop.raise_info
+    assert ri(0, 100, 5000, "BTN")["tier"] == "none"
+    assert ri(100, 100, 5000, "BTN")["tier"] == "limp"                 # 1bb to call = a limp
+    assert ri(250, 100, 5000, "BTN")["tier"] == "normal"               # raise to 2.5bb
+    assert ri(150, 100, 5000, "BB")["raise_bb"] == 2.5                 # BB already posted 1bb
+    assert ri(700, 100, 5000, "CO")["tier"] == "big"
+    assert ri(1500, 100, 10000, "CO")["tier"] == "shove"
+    assert ri(2500, 100, 5000, "CO")["tier"] == "shove"                # 50% of stack
+    assert ri(300, None, None, "BTN")["tier"] == "normal"              # no big blind known
+
+def test_preflop_by_raise_size():
+    aj = ["Ah", "Jd"]
+    assert preflop.advise(aj, "BTN", 100, True, "normal", 2.5)["action"] == "CALL"
+    assert preflop.advise(aj, "BTN", 100, True, "big", 8)["action"] == "FOLD"      # AJo too weak for a 3-bet
+    assert preflop.advise(aj, "BTN", 100, True, "shove", 40)["action"] == "FOLD"
+    assert preflop.advise(["Ah", "Kd"], "BTN", 100, True, "shove", 40)["action"] == "CALL"
+    assert preflop.advise(["Kh", "Kd"], "CO", 100, True, "big", 8)["action"] == "RAISE"
+    assert preflop.advise(["Th", "Td"], "CO", 100, True, "big", 8)["action"] == "CALL"
+
+def test_service_detects_raise_size():
+    from pokercalc.service import evaluate
+    base = dict(hole=["Ah", "Jd"], board=[], pot=450, opps=1, position="BTN", stack=10000, bb=100, range_mode="auto")
+    n = evaluate({**base, "call": 250}, sims=1500)
+    b = evaluate({**base, "call": 800, "pot": 1000}, sims=1500)
+    assert "normal-size raise" in n["preflop"]["size"] and n["action"] == "CALL"
+    assert "big raise" in b["preflop"]["size"] and b["action"] == "FOLD"
+    assert b["range_pct_used"] < n["range_pct_used"]                    # bigger raise = tighter assumed range

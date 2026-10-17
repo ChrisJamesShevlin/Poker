@@ -252,7 +252,7 @@ function toggle(code){
   else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
   renderAll();schedule();
 }
-function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0);$('multiWrap').classList.toggle('hidden',nb<4)}
+function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0||!!(session&&session.bb));$('multiWrap').classList.toggle('hidden',nb<4)}
 
 /* ---------- calculation ---------- */
 function state(){
@@ -299,7 +299,7 @@ function show(d,s){
   if(d.outs)kv.push(['Outs',`${d.outs} (to two pair or better)`]);
   if(d.rule24)kv.push(['Rule of 2/4',d.rule24]);
   if(d.stack_line)kv.push(['Stack',d.stack_line.replace(/^Stack /,'')]);
-  if(d.preflop){kv.push(['Preflop',d.preflop.text]);if(d.preflop.note)kv.push(['Note',d.preflop.note])}
+  if(d.preflop){if(d.preflop.size)kv.push(['Raise size',d.preflop.size]);kv.push(['Preflop',d.preflop.text]);if(d.preflop.note)kv.push(['Note',d.preflop.note])}
   $('kv').innerHTML=kv.map(([k,v])=>`<li><span class="k">${k}</span>${v}</li>`).join('');
   $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - try Auto or a Top % range.':'';
 }

@@ -30,7 +30,7 @@ def bet_size_note(pot, call):
     return ratio, word
 
 
-def resolve(pot, call, board_len, raiser=None, table="normal", multi_street=False):
+def resolve(pot, call, board_len, raiser=None, table="normal", multi_street=False, extra_steps=0):
     """Returns (classes, label, approx_pct_of_hands)."""
     if call > 0 and board_len >= 3:
         ratio, word = bet_size_note(pot, call)
@@ -40,10 +40,13 @@ def resolve(pot, call, board_len, raiser=None, table="normal", multi_street=Fals
         base, why = (0 if raiser else 1), "facing a raise"
     else:
         base, why = 0, "no bet to face"
-    extra = (board_len - 3) if multi_street and board_len >= 4 else 0
+    street_steps = (board_len - 3) if multi_street and board_len >= 4 else 0
+    extra = street_steps + extra_steps
     shift = TABLE_SHIFT.get(table, 0)
     notes = [why]
-    if extra:
+    if extra_steps:
+        notes.append("big raise, so tighter")
+    if street_steps:
         notes.append("betting every street")
     if shift:
         notes.append(f"{table} table")

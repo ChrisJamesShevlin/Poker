@@ -10,21 +10,28 @@ def evaluate(d, sims=20000):
     hole, board = d["hole"], d["board"]
     pot, call = float(d.get("pot") or 0), float(d.get("call") or 0)
     opps = int(d.get("opps") or 1)
+    stack = float(d["stack"]) if d.get("stack") else None
+    bb = float(d["bb"]) if d.get("bb") else None
+    position = d.get("position") or "BTN"
+
+    # Preflop: the raise size is worked out from 'bet to call' alone
+    rinfo = None if board else preflop.raise_info(call, bb, stack, position)
+    facing = bool(d.get("facing"))
+    if rinfo and (bb or rinfo["tier"] == "shove"):
+        facing = rinfo["facing"]          # detected, so the toggle isn't needed
+    tier = rinfo["tier"] if rinfo and facing else "normal"
+    steps = {"big": 1, "shove": 2}.get(tier, 0)
+
     mode = d.get("range_mode", d.get("range_pct") or 0)
-    classes, rlabel, rpct = None, "Random hands", None
+    classes, rlabel, rpct, pct = None, "Random hands", None, None
     if mode == "auto":
         classes, rlabel, rpct = resolve(pot, call, len(board), d.get("raiser") or None,
-                                        d.get("table") or "normal", bool(d.get("multi_street")))
+                                        d.get("table") or "normal", bool(d.get("multi_street")),
+                                        extra_steps=steps)
         rlabel = "Auto: " + rlabel
     elif mode:
         pct = int(mode)
         rlabel, rpct = f"Top {pct}% (you chose)", pct
-    else:
-        pct = None
-    pct = int(mode) if mode and mode != "auto" else None
-    stack, bb = d.get("stack") or None, d.get("bb") or None
-    stack = float(stack) if stack else None
-    bb = float(bb) if bb else None
     win, tie, eq = equity(hole, board, opps, pct, sims=sims, range_classes=classes)
     req, ratio = pot_odds(pot, call)
     out = {"equity": eq, "win": win, "tie": tie, "required": req, "ratio": ratio,
@@ -45,9 +52,13 @@ def evaluate(d, sims=20000):
             r = describe.rule_of_2_and_4(info["outs"], len(board))
             out["rule24"] = r[1] if r else None
     else:
-        g = preflop.advise(hole, d.get("position") or "BTN", stack / bb if stack and bb else None,
-                           bool(d.get("facing")))
+        g = preflop.advise(hole, position, stack / bb if stack and bb else None, facing, tier,
+                           rinfo["raise_bb"] if rinfo else None)
         out["preflop"] = {"text": g["text"], "why": g["why"]}
+        if rinfo and rinfo["tier"] != "none":
+            names = {"limp": "limped pot (no raise)", "normal": "normal-size raise",
+                     "big": "big raise (likely a 3-bet)", "shove": "huge raise or shove"}
+            out["preflop"]["size"] = (f"~{rinfo['raise_bb']:.1f}bb - " if rinfo["raise_bb"] else "") + names[rinfo["tier"]]
         out["hold"] = {"title": f"{g['class']} - {preflop.describe_class(g['class'])}",
                        "tier": f"{preflop.tier(g['pct'])} hand, rank {g['rank']}/169 (top {g['pct']:.0f}%)",
                        "draws": [], "texture": [], "nuts": None, "ahead": None, "outs": None}
