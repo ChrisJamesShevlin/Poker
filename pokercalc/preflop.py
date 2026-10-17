@@ -64,6 +64,8 @@ OPEN = {
 # Vs a UTG/HJ open the value range tightens to QQ+ and AK (same source's guidance).
 THREE_BET = expand("JJ+, AKs, AKo, A5s, A4s")
 THREE_BET_VS_EARLY = expand("QQ+, AKs, AKo")
+# Small blind vs an early-position open: re-raise or fold, never flat (PokerSkill 3-bet chart, 4.8% of hands)
+SB_VS_EARLY = expand("JJ+, AKo, AJs+, A5s-A2s")
 CALL = {
     "UTG": expand("66-TT, ATs+, KQs, KJs, QJs, JTs, T9s, AQo"),
     "HJ": expand("66-TT, ATs+, KJs+, QJs, JTs, T9s, 98s, AQo"),
@@ -190,16 +192,24 @@ def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=
             act, why = "FOLD", f"{size}: outside the top ~{BIG_CONTINUE_PCT[position]}% you can continue with"
     else:
         early = raiser in ("UTG", "HJ")      # earlier-position raisers have stronger ranges
-        call = _trim(CALL[position], stack_bb)
-        if early:
+        if position == "BB":
+            from .bbdefense import defend_set   # derived from pot odds, see bbdefense.py
+            call = _trim(defend_set(raiser or "CO"), stack_bb)
+        else:
+            call = _trim(CALL[position], stack_bb)
+        if early and position != "BB":
             call = call | {"JJ"}             # JJ calls (not re-raises) an early-position open
             order = [c for c in ranking() if c in call]
             call = set(order[: math.ceil(len(order) * 0.7)])
-        three_bet = THREE_BET_VS_EARLY if early else THREE_BET
+        if position == "SB" and early:
+            three_bet, call = SB_VS_EARLY, set()
+        else:
+            three_bet = THREE_BET_VS_EARLY if early else THREE_BET
+        src = " (derived from pot odds)" if position == "BB" else ""
         if cls in three_bet:
             act, why = "RAISE", ("premium: re-raise" if early else "premium or good bluff-3-bet hand: re-raise")
         elif cls in call:
-            act, why = "CALL", f"in the {position} calling chart vs a raise" + (f" from {raiser}" if early else "")
+            act, why = "CALL", f"in the {position} calling chart vs a raise" + (f" from {raiser}" if raiser else "") + src
         else:
-            act, why = "FOLD", f"not in the {position} calling chart vs a raise" + (f" from {raiser}" if early else "")
+            act, why = "FOLD", f"not in the {position} calling chart vs a raise" + (f" from {raiser}" if raiser else "") + src
     return {"action": act, "text": head, "why": why, "class": cls, "rank": rank, "pct": pct}

@@ -290,3 +290,21 @@ def test_facing_raise_by_raiser_position():
     assert preflop.advise(jj, "BTN", 100, True, "normal", 2.5, "CO")["action"] == "RAISE"     # JJ 3-bets a CO open
     assert preflop.advise(jj, "BTN", 100, True, "normal", 2.5, "UTG")["action"] == "CALL"     # but only calls a UTG open
     assert preflop.advise(["Qh", "Qd"], "BTN", 100, True, "normal", 2.5, "UTG")["action"] == "RAISE"
+
+
+def test_big_blind_defence_widths_and_sanity():
+    from pokercalc.bbdefense import defend_set, TARGET
+    from pokercalc.preflop import _n
+    for r, want in TARGET.items():
+        assert abs(100 * _n(defend_set(r)) / 1326 - want) < 1.0, r
+    assert len(defend_set("UTG")) < len(defend_set("CO")) < len(defend_set("BTN"))
+    btn = defend_set("BTN")
+    assert {"76s", "T9s", "22", "A9o"} <= btn and not ({"72o", "K4o", "32o"} & btn)
+
+def test_big_blind_vs_raise_and_small_blind_rules():
+    assert preflop.advise(["7h", "6h"], "BB", 100, True, "normal", 2.0, "BTN")["action"] == "CALL"
+    assert preflop.advise(["7h", "2d"], "BB", 100, True, "normal", 2.0, "BTN")["action"] == "FOLD"
+    assert preflop.advise(["7h", "6h"], "BB", 100, True, "normal", 2.0, "UTG")["action"] == "FOLD"   # tighter vs UTG
+    assert preflop.advise(["Ah", "As"], "BB", 100, True, "normal", 2.0, "CO")["action"] == "RAISE"
+    assert preflop.advise(["Th", "Td"], "SB", 100, True, "normal", 2.0, "UTG")["action"] == "FOLD"    # SB never flats an early open
+    assert preflop.advise(["Ah", "5h"], "SB", 100, True, "normal", 2.0, "UTG")["action"] == "RAISE"   # A5s is a 3-bet bluff
