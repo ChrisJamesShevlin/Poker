@@ -51,6 +51,7 @@ input:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .action{font-size:54px;font-weight:800;letter-spacing:1px;line-height:1}
 .a-FOLD{color:var(--bad)}.a-CALL{color:var(--blue)}.a-RAISE,.a-BET{color:var(--good)}.a-CHECK{color:var(--dim)}
 .why{color:var(--dim);margin:6px 0 12px}
+.sizing{margin:-4px 0 12px;display:inline-block;background:#1b3552;color:#cfe3ff;border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:600}
 .hold{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .hold .t{font-size:21px;font-weight:700}.hold .d{color:var(--dim);font-size:13.5px;margin-top:3px}
 .hold .tag{display:inline-block;background:#0f4d2a;color:#b9f6ca;border-radius:6px;padding:1px 7px;font-size:12px;margin-right:5px}
@@ -117,6 +118,7 @@ dialog .field{margin-bottom:10px}
       <div id="out" class="hidden">
         <div class="action" id="action">-</div>
         <div class="why" id="why"></div>
+        <div class="sizing hidden" id="sizing"></div>
         <div class="hold" id="hold"></div>
         <div class="bartxt"><span>Your equity</span><span>Needed to call <b style="color:var(--amber)" id="reqTxt"></b></span></div>
         <div class="bar"><i id="eqBar"></i><b id="reqMark"></b></div>
@@ -292,6 +294,7 @@ function show(d,s){
   $('empty').classList.add('hidden');$('out').classList.remove('hidden');
   $('action').textContent=d.action;$('action').className='action a-'+d.action;
   $('why').textContent=d.why;
+  $('sizing').textContent=d.sizing?'Suggested size: '+d.sizing:'';$('sizing').classList.toggle('hidden',!d.sizing);
   $('eqTxt').textContent=(d.equity*100).toFixed(1)+'% equity';
   $('eqBar').style.width=(d.equity*100)+'%';
   const showReq=s.call>0;

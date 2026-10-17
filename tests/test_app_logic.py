@@ -215,3 +215,59 @@ def test_old_database_is_upgraded(tmp_path):
     s = analytics.summary(con)
     assert s["session_pl"] == [300] and s["total_deposits"] == 0
     store.connect(path)                # running it again must be harmless
+
+
+# ---- postflop advice v2 -------------------------------------------------------------------
+FD = {"draws": ["flush draw"], "outs": 9, "texture": ["3 hearts on board - flush possible"], "made": "High Card"}
+DRY = {"draws": [], "outs": 0, "texture": [], "made": "Pair"}
+COMBO = {"draws": ["flush draw", "open-ended straight draw"], "outs": 15, "texture": ["3 hearts on board - flush possible"], "made": "High Card"}
+FLOP = ["Kc", "7h", "2d"]
+
+
+def pf(eq, pot=1000, call=0, opps=1, stack=10000, pos="BTN", hold=DRY, board=FLOP):
+    return advice.suggest_postflop(eq, pot, call, opps, stack, pos, board, hold)
+
+
+def test_value_bet_size_follows_board_texture():
+    a, _, sz = pf(0.90, hold=DRY)
+    assert a == "BET" and "500" in sz                                   # dry board: half pot
+    a, _, sz = pf(0.90, hold={**DRY, "texture": ["straight possible"]})
+    assert a == "BET" and "750" in sz                                   # wet board: bigger
+
+def test_position_moves_the_value_line():
+    assert pf(0.64, pos="BTN")[0] == "BET"
+    assert pf(0.64, pos="BB")[0] == "CHECK"
+
+def test_semi_bluff_with_a_draw():
+    a, why, sz = pf(0.35, hold=FD)
+    assert a == "BET" and "semi-bluff" in why and sz
+    assert pf(0.35, hold=FD, opps=3)[0] == "CHECK"                      # too many opponents to bluff
+    assert pf(0.25, hold=FD, pos="BB")[0] == "CHECK"                    # weak, out of position: free card
+    assert pf(0.35, hold=FD, board=FLOP + ["3c", "9s"])[0] == "CHECK"   # river: the draw is gone
+
+def test_medium_hand_checks():
+    assert pf(0.45)[0] == "CHECK"
+
+def test_facing_bet_fold_call_and_implied_odds():
+    assert pf(0.20, call=500, pot=1500)[0] == "FOLD"
+    a, why, _ = pf(0.22, call=500, pot=1500, hold=FD, stack=10000)
+    assert a == "CALL" and "implied odds" in why
+    assert pf(0.22, call=500, pot=1500, hold=FD, stack=1500)[0] == "FOLD"   # shallow: no implied odds
+
+def test_raise_sizing_and_commitment():
+    a, _, sz = pf(0.90, call=300, pot=1300, stack=20000)
+    assert a == "RAISE" and "900" in sz                                  # 3x their bet
+    a, _, sz = pf(0.90, call=300, pot=1300, stack=1200)
+    assert a == "RAISE" and "all-in" in sz                               # raise would commit the stack
+    assert pf(0.90, call=1000, pot=2000, stack=1000)[0] == "CALL"        # already all-in: only call
+
+def test_combo_draw_semi_bluff_raise():
+    a, why, _ = pf(0.55, call=300, pot=1300, hold=COMBO)
+    assert a == "RAISE" and "semi-bluff" in why
+    assert pf(0.45, call=300, pot=1300, hold=COMBO, opps=2)[0] == "CALL"  # not into several opponents
+
+def test_service_returns_sizing_postflop():
+    from pokercalc.service import evaluate
+    r = evaluate(dict(hole=["Ah", "Ad"], board=["Kc", "7h", "2d"], pot=600, call=0, opps=1, position="BTN",
+                      stack=10000, bb=100, range_mode=40), sims=2000)
+    assert r["action"] == "BET" and r["sizing"]

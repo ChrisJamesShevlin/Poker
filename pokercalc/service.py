@@ -44,6 +44,7 @@ def evaluate(d, sims=20000):
                              (f" - SPR {stack/pot:.1f}" if pot else "") +
                              (" - call puts you all-in" if call and call >= stack else ""))
     action, why = advice.suggest(eq, pot, call, opps, stack)
+    sizing = None
     if board:
         info = describe.analyse(hole, board)
         out["hold"] = describe.hold_summary(hole, board)
@@ -51,6 +52,7 @@ def evaluate(d, sims=20000):
             out["outs"] = info["outs"]
             r = describe.rule_of_2_and_4(info["outs"], len(board))
             out["rule24"] = r[1] if r else None
+        action, why, sizing = advice.suggest_postflop(eq, pot, call, opps, stack, position, board, out["hold"])
     else:
         g = preflop.advise(hole, position, stack / bb if stack and bb else None, facing, tier,
                            rinfo["raise_bb"] if rinfo else None)
@@ -65,5 +67,5 @@ def evaluate(d, sims=20000):
         action, why = g["action"], g["why"]
         if call > 0 and action == "CALL" and eq < req - 0.02:
             out["preflop"]["note"] = f"Guide says call, but pot odds need {req:.0%} and you have {eq:.0%}."
-    out["action"], out["why"] = action, why
+    out["action"], out["why"], out["sizing"] = action, why, sizing
     return out
