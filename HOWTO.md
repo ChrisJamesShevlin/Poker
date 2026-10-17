@@ -15,6 +15,10 @@ Start the study tool (opens http://127.0.0.1:5173):
 
 Stop it: Ctrl+C in that terminal (or `pkill -f "python3 server.py"`).
 
+Restart after any update (the server does not reload itself), then refresh the page:
+
+    pkill -f "python3 server.py"; python3 server.py
+
 Run the tests:
 
     python3 -m pytest -q
