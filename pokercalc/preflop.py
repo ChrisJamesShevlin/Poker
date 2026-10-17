@@ -21,7 +21,12 @@ def expand(spec):
         m = re.fullmatch(r"([2-9TJQKA])([2-9TJQKA])([so]?)(\+|-([2-9TJQKA])([2-9TJQKA])[so]?)?", tok)
         if not m:
             raise ValueError(f"bad chart token {tok!r}")
-        a, b, kind, suffix, c, _d = m.groups()
+        a, b, kind, suffix, c, d = m.groups()
+        if a != b and suffix and suffix.startswith("-"):   # e.g. A5s-A2s: same high card, kickers b..d
+            hi_r, lo1, lo2 = a, b, d
+            for i in range(min(_R[lo1], _R[lo2]), max(_R[lo1], _R[lo2]) + 1):
+                out.add(hi_r + RANKS[i] + kind)
+            continue
         if a == b:  # pairs
             lo, hi = _R[a], _R[a]
             if suffix == "+":
@@ -45,22 +50,26 @@ def _n(cs):
     return sum(len(combos(c)) for c in cs)
 
 
-# Raise-first-in (open) charts, ~100bb
+# Raise-first-in (open) charts, ~100bb 6-max. Source: PokerSkill opening ranges
+# (https://www.pokerskill.com/charts/opening-ranges/): UTG 14.3%, HJ 18.9%, CO 25.5%, BTN 43.3%, SB 33.0%.
 OPEN = {
-    "UTG": expand("22+, A2s+, KTs+, QTs+, JTs, T9s, 98s, 87s, 76s, AJo+, KQo"),
-    "HJ": expand("22+, A2s+, K9s+, Q9s+, J9s+, T9s, 98s, 87s, 76s, 65s, ATo+, KJo+, QJo"),
-    "CO": expand("22+, A2s+, K6s+, Q8s+, J8s+, T8s+, 97s+, 86s+, 75s+, 65s, 54s, A9o+, KTo+, QTo+, JTo"),
-    "BTN": expand("22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 85s+, 75s+, 64s+, 54s, "
-                  "A2o+, K8o+, Q9o+, J8o+, T8o+, 98o, 87o"),
-    "SB": expand("22+, A2s+, K2s+, Q5s+, J7s+, T7s+, 97s+, 86s+, 76s, 65s, 54s, A2o+, K9o+, Q9o+, J9o+, T9o"),
+    "UTG": expand("22+, ATs+, A5s-A2s, KTs+, QTs+, JTs, T9s, 98s, AJo+, KQo"),
+    "HJ": expand("22+, A2s+, K9s+, Q9s+, J9s+, T8s+, 98s, 87s, ATo+, KJo+"),
+    "CO": expand("22+, A2s+, K5s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, 54s, A8o+, KTo+, QJo"),
+    "BTN": expand("22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 95s+, 85s+, 75s+, 64s+, 54s, A2o+, K8o+, Q9o+, J9o+, T9o, 98o"),
+    "SB": expand("22+, A2s+, K4s+, Q6s+, J7s+, T7s+, 96s+, 86s+, 76s, 65s, 54s, A5o+, K9o+, QTo+, JTo"),
 }
 # Facing a single raise: re-raise (3-bet) and call charts by your position
-THREE_BET = expand("JJ+, AQs+, AKo, A5s, A4s")
+# Vs a CO/BTN/SB open: JJ+ and AK for value (PokerSkill's BTN-vs-CO chart also adds many suited bluffs; we keep A5s/A4s).
+# Vs a UTG/HJ open the value range tightens to QQ+ and AK (same source's guidance).
+THREE_BET = expand("JJ+, AKs, AKo, A5s, A4s")
+THREE_BET_VS_EARLY = expand("QQ+, AKs, AKo")
 CALL = {
     "UTG": expand("66-TT, ATs+, KQs, KJs, QJs, JTs, T9s, AQo"),
     "HJ": expand("66-TT, ATs+, KJs+, QJs, JTs, T9s, 98s, AQo"),
     "CO": expand("55-TT, A9s+, KTs+, QTs+, JTs, T9s, 98s, 87s, AQo, KQo"),
-    "BTN": expand("22-TT, A2s+, K9s+, Q9s+, J9s+, T9s, 98s, 87s, 76s, 65s, AJo+, KQo"),
+    # BTN: PokerSkill's "button vs cutoff open" calling chart (14.0% of hands)
+    "BTN": expand("22-TT, A9s-A6s, AQs, AJs, ATs, KTs, K9s, QJs, QTs, Q9s, JTs, J9s, T9s, T8s, 98s, 87s, AQo, AJo, KQo, KJo, QJo"),
     "SB": expand("77-TT, ATs+, KQs, QJs, JTs, AQo"),
     "BB": expand("22-TT, A2s+, K5s+, Q7s+, J8s+, T8s+, 97s+, 86s+, 75s+, 65s, 54s, ATo+, KTo+, QTo+, JTo"),
 }
@@ -142,7 +151,7 @@ def raise_info(call, bb, stack, position):
     return {"raise_bb": raise_bb, "tier": tier, "facing": tier in ("normal", "big", "shove")}
 
 
-def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=None):
+def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=None, raiser=None):
     cls = hole_class(*hole)
     rank = ranking().index(cls) + 1
     pct = percentile(cls)
@@ -180,11 +189,17 @@ def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=
         else:
             act, why = "FOLD", f"{size}: outside the top ~{BIG_CONTINUE_PCT[position]}% you can continue with"
     else:
+        early = raiser in ("UTG", "HJ")      # earlier-position raisers have stronger ranges
         call = _trim(CALL[position], stack_bb)
-        if cls in THREE_BET:
-            act, why = "RAISE", "premium or good bluff-3-bet hand: re-raise"
+        if early:
+            call = call | {"JJ"}             # JJ calls (not re-raises) an early-position open
+            order = [c for c in ranking() if c in call]
+            call = set(order[: math.ceil(len(order) * 0.7)])
+        three_bet = THREE_BET_VS_EARLY if early else THREE_BET
+        if cls in three_bet:
+            act, why = "RAISE", ("premium: re-raise" if early else "premium or good bluff-3-bet hand: re-raise")
         elif cls in call:
-            act, why = "CALL", f"in the {position} calling chart vs a raise"
+            act, why = "CALL", f"in the {position} calling chart vs a raise" + (f" from {raiser}" if early else "")
         else:
-            act, why = "FOLD", f"not in the {position} calling chart vs a raise"
+            act, why = "FOLD", f"not in the {position} calling chart vs a raise" + (f" from {raiser}" if early else "")
     return {"action": act, "text": head, "why": why, "class": cls, "rank": rank, "pct": pct}

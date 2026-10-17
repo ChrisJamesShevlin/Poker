@@ -62,7 +62,7 @@ def test_chart_sizes():
 
 def test_preflop_charts():
     assert preflop.advise(["7h", "6h"], "BTN", 100, False)["action"] == "RAISE"
-    assert preflop.advise(["7h", "6h"], "UTG", 100, False)["action"] == "RAISE"
+    assert preflop.advise(["7h", "6h"], "UTG", 100, False)["action"] == "FOLD"      # 76s is not in the UTG chart
     assert preflop.advise(["7h", "2d"], "UTG", 100, False)["action"] == "FOLD"
     assert preflop.advise(["9h", "9d"], "BTN", 100, True)["action"] == "CALL"
 
@@ -271,3 +271,22 @@ def test_service_returns_sizing_postflop():
     r = evaluate(dict(hole=["Ah", "Ad"], board=["Kc", "7h", "2d"], pot=600, call=0, opps=1, position="BTN",
                       stack=10000, bb=100, range_mode=40), sims=2000)
     assert r["action"] == "BET" and r["sizing"]
+
+
+def test_open_charts_match_published_percentages():
+    from pokercalc.preflop import OPEN, _n
+    # PokerSkill 6-max opening ranges: UTG 14.3, HJ 18.9, CO 25.5, BTN 43.3, SB 33.0 (% of hands)
+    for pos, want in {"UTG": 14.3, "HJ": 18.9, "CO": 25.5, "BTN": 43.3, "SB": 33.0}.items():
+        assert abs(100 * _n(OPEN[pos]) / 1326 - want) < 0.1, pos
+
+def test_range_syntax_with_descending_kickers():
+    from pokercalc.preflop import expand
+    assert expand("A5s-A2s") == {"A5s", "A4s", "A3s", "A2s"}
+    assert expand("A9s-A6s") == {"A9s", "A8s", "A7s", "A6s"}
+
+def test_facing_raise_by_raiser_position():
+    aqs, jj = ["Ah", "Qs"], ["Jh", "Jd"]
+    assert preflop.advise(aqs, "BTN", 100, True, "normal", 2.5, "CO")["action"] == "CALL"     # call, not 3-bet
+    assert preflop.advise(jj, "BTN", 100, True, "normal", 2.5, "CO")["action"] == "RAISE"     # JJ 3-bets a CO open
+    assert preflop.advise(jj, "BTN", 100, True, "normal", 2.5, "UTG")["action"] == "CALL"     # but only calls a UTG open
+    assert preflop.advise(["Qh", "Qd"], "BTN", 100, True, "normal", 2.5, "UTG")["action"] == "RAISE"

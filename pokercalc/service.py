@@ -55,7 +55,7 @@ def evaluate(d, sims=20000):
         action, why, sizing = advice.suggest_postflop(eq, pot, call, opps, stack, position, board, out["hold"])
     else:
         g = preflop.advise(hole, position, stack / bb if stack and bb else None, facing, tier,
-                           rinfo["raise_bb"] if rinfo else None)
+                           rinfo["raise_bb"] if rinfo else None, d.get("raiser") or None)
         out["preflop"] = {"text": g["text"], "why": g["why"]}
         if rinfo and rinfo["tier"] != "none":
             names = {"limp": "limped pot (no raise)", "normal": "normal-size raise",
