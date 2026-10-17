@@ -194,3 +194,24 @@ def test_service_detects_raise_size():
     assert "normal-size raise" in n["preflop"]["size"] and n["action"] == "CALL"
     assert "big raise" in b["preflop"]["size"] and b["action"] == "FOLD"
     assert b["range_pct_used"] < n["range_pct_used"]                    # bigger raise = tighter assumed range
+
+
+def test_old_database_is_upgraded(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(str(path))   # a database from before deposits existed
+    old.executescript("""
+      CREATE TABLE sessions(id INTEGER PRIMARY KEY, start_ts REAL, end_ts REAL,
+        balance_before REAL, buy_in REAL, bb REAL, balance_after REAL);
+      CREATE TABLE hands(id INTEGER PRIMARY KEY, session_id INTEGER, ts REAL, hole TEXT, board TEXT,
+        pot REAL, call REAL, opps INTEGER, range_pct INTEGER, position TEXT, stack REAL, equity REAL,
+        required REAL, suggested TEXT, taken TEXT, result REAL);
+      INSERT INTO sessions VALUES(1, 1000, 2000, 5000, 500, 20, 5300);
+    """)
+    old.commit(); old.close()
+    con = store.connect(path)          # should add the new columns without losing the row
+    cols = {r[1] for r in con.execute("PRAGMA table_info(sessions)")}
+    assert {"deposit_before", "deposit_during"} <= cols
+    s = analytics.summary(con)
+    assert s["session_pl"] == [300] and s["total_deposits"] == 0
+    store.connect(path)                # running it again must be harmless
