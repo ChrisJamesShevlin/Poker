@@ -65,3 +65,25 @@ def test_preflop_charts():
     assert preflop.advise(["7h", "6h"], "UTG", 100, False)["action"] == "RAISE"
     assert preflop.advise(["7h", "2d"], "UTG", 100, False)["action"] == "FOLD"
     assert preflop.advise(["9h", "9d"], "BTN", 100, True)["action"] == "CALL"
+
+
+def test_auto_range_tightens_with_bet_size():
+    from pokercalc.oprange import resolve
+    small = resolve(1100, 100, 3)[2]
+    big = resolve(2000, 1000, 3)[2]
+    assert big < small
+    assert resolve(2000, 1000, 3, table="loose")[2] > big
+    assert resolve(2000, 1000, 3, table="tight")[2] < big
+    assert resolve(1500, 500, 4, multi_street=True)[2] < resolve(1500, 500, 4)[2]
+
+def test_raiser_range_is_open_chart():
+    from pokercalc.oprange import resolve
+    full = resolve(300, 100, 0, raiser="UTG")
+    assert 14 <= full[2] <= 18
+    assert resolve(2000, 1000, 3, raiser="UTG")[2] < full[2]
+
+def test_service_auto_range():
+    from pokercalc.service import evaluate
+    r = evaluate(dict(hole=["Ah", "Kd"], board=["Qc", "7h", "2d"], pot=1000, call=400,
+                      opps=1, range_mode="auto"), sims=2000)
+    assert r["range_label"].startswith("Auto: ") and r["range_pct_used"]

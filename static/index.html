@@ -137,6 +137,9 @@ dialog .field{margin-bottom:10px}
         <div class="field"><label>Bet to call</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
         <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
         <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
+        <div class="field wide"><label>Who raised before the flop?</label><div class="seg" id="raiserSeg"></div></div>
+        <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
+        <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
         <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
         <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
@@ -182,13 +185,15 @@ dialog .field{margin-bottom:10px}
 const RANKS=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
 const SUITS=[['s','♠'],['h','♥'],['d','♦'],['c','♣']];
 const POS=['UTG','HJ','CO','BTN','SB','BB'];
-const RANGES=[['Random',0],['Top 40%',40],['Top 25%',25],['Top 15%',15]];
+const RANGES=[['Auto','auto'],['Random',0],['Top 40%',40],['Top 25%',25],['Top 15%',15]];
+const TABLES=[['Loose','loose'],['Normal','normal'],['Tight','tight']];
+const RAISERS=[['None',''],['UTG','UTG'],['HJ','HJ'],['CO','CO'],['BTN','BTN'],['SB','SB']];
 const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 let slots=Array(7).fill(null);          // 0,1 hole; 2..6 board
-let opps=store.get('opps',2), rangePct=store.get('range',40), pos=store.get('pos','BTN');
+let opps=store.get('opps',2), rangePct=store.get('range','auto'), table=store.get('table','normal'), raiser='', multi=false, pos=store.get('pos','BTN');
 let facing=false, taken=null, last=null, pendingRank=null, reqId=0, timer=null, session=null;
 
 /* ---------- segmented controls ---------- */
@@ -203,6 +208,9 @@ function seg(id,items,get,set){
 function buildControls(){
   seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
   seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
+  seg('raiserSeg',RAISERS,()=>raiser,v=>raiser=v);
+  seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
+  seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
   seg('facingSeg',[['No raise yet',false],['Facing a raise',true]],()=>facing,v=>facing=v);
   seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
@@ -255,12 +263,12 @@ function toggle(code){
   else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
   renderAll();schedule();
 }
-function renderAll(){renderSlots();$('facingWrap').classList.toggle('hidden',slots.slice(2).some(Boolean))}
+function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0);$('multiWrap').classList.toggle('hidden',nb<4)}
 
 /* ---------- calculation ---------- */
 function state(){
   return {hole:slots.slice(0,2).filter(Boolean), board:slots.slice(2).filter(Boolean),
-    pot:+$('pot').value||0, call:+$('call').value||0, opps, range_pct:rangePct||null,
+    pot:+$('pot').value||0, call:+$('call').value||0, opps, range_mode:rangePct, raiser, table, multi_street:multi,
     position:pos, facing, stack:+$('stack').value||null, bb:session?session.bb:null};
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(calc,120)}
@@ -297,26 +305,27 @@ function show(d,s){
     (h.ahead!=null?`<div class="d">Beats ${(h.ahead*100).toFixed(0)}% of possible hands. ${h.nuts}</div>`:'')):'';
   const kv=[];
   kv.push(['Win / tie',`${(d.win*100).toFixed(1)}% / ${(d.tie*100).toFixed(1)}%`]);
+  kv.push(['Their range',d.range_label]);
   if(showReq){kv.push(['Pot odds',d.ratio]);kv.push(['Verdict',d.verdict])}
   if(d.outs)kv.push(['Outs',`${d.outs} (to two pair or better)`]);
   if(d.rule24)kv.push(['Rule of 2/4',d.rule24]);
   if(d.stack_line)kv.push(['Stack',d.stack_line.replace(/^Stack /,'')]);
   if(d.preflop){kv.push(['Preflop',d.preflop.text]);if(d.preflop.note)kv.push(['Note',d.preflop.note])}
   $('kv').innerHTML=kv.map(([k,v])=>`<li><span class="k">${k}</span>${v}</li>`).join('');
-  $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - pick a Top % range for a realistic view.':'';
+  $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - try Auto or a Top % range.':'';
 }
 
 /* ---------- save / clear ---------- */
 async function save(){
   if(!last)return;
-  const b={...last.s,equity:last.d.equity,required:last.d.required,suggested:last.d.action,
+  const b={...last.s,range_pct:last.d.range_pct_used,equity:last.d.equity,required:last.d.required,suggested:last.d.action,
            taken,result:$('result').value};
   await fetch('/api/hand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   clearHand(); toast('Saved');
 }
 function clearHand(){
   slots=Array(7).fill(null);$('pot').value='';$('call').value='0';$('result').value='';
-  facing=false;taken=null;last=null;buildControls();renderAll();schedule();
+  facing=false;raiser='';multi=false;taken=null;last=null;buildControls();renderAll();schedule();
 }
 function toast(t){const e=document.createElement('div');e.textContent=t;
   Object.assign(e.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',background:'#22c55e',color:'#04210f',padding:'8px 16px',borderRadius:'8px',fontWeight:'700'});

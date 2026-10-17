@@ -11,7 +11,8 @@ FULL_DECK = [r + s for r in RANKS for s in SUITS]
 
 
 def equity(hole: List[str], board: List[str], opponents: int,
-           range_pct: Optional[int] = None, sims: int = 20000, seed: Optional[int] = None):
+           range_pct: Optional[int] = None, sims: int = 20000, seed: Optional[int] = None,
+           range_classes=None):
     """Returns (win, tie, equity) as fractions. Ties count half in equity."""
     rng = random.Random(seed)
     cards = {c: eval7.Card(c) for c in FULL_DECK}
@@ -20,8 +21,9 @@ def equity(hole: List[str], board: List[str], opponents: int,
     brd = [cards[c] for c in board]
     deck = [c for c in FULL_DECK if c not in dead]
     pool = None
-    if range_pct:
-        pool = [(a, b) for cls in top_percent(range_pct) for a, b in combos(cls)
+    if range_pct or range_classes:
+        classes = range_classes if range_classes else top_percent(range_pct)
+        pool = [(a, b) for cls in classes for a, b in combos(cls)
                 if a not in dead and b not in dead]
         if not pool:
             raise ValueError("Range is empty after removing known cards")
