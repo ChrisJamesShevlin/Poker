@@ -66,6 +66,12 @@ def hand():
     return jsonify(ok=True)
 
 
+@app.post("/api/history/clear")
+def history_clear():
+    store.clear_history(db())
+    return jsonify(ok=True)
+
+
 @app.get("/api/analytics")
 def analytics_api():
     return jsonify(analytics.summary(db()))

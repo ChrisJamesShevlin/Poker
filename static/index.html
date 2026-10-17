@@ -151,6 +151,9 @@ dialog .field{margin-bottom:10px}
 </section>
 
 <section id="analytics" class="hidden">
+  <div class="logrow" style="justify-content:flex-end;margin-bottom:12px">
+    <button class="btn ghost" id="clearHist" style="color:var(--bad)">Clear history</button>
+  </div>
   <div class="stats" id="statCards"></div>
   <div class="charts">
     <div class="chart"><canvas id="c1"></canvas></div>
@@ -411,6 +414,9 @@ async function loadAnalytics(){
 
 $('pot').oninput=$('call').oninput=$('stack').oninput=schedule;
 $('stack').value=store.get('stack','')||'';$('stack').addEventListener('input',()=>store.set('stack',$('stack').value));
+$('clearHist').onclick=async()=>{
+  if(!confirm('Clear ALL saved history?\n\nThis permanently deletes every saved session and hand, and the analytics start from zero. It cannot be undone.'))return;
+  await fetch('/api/history/clear',{method:'POST'});await loadSession();loadAnalytics()};
 $('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
 buildControls();renderAll();loadSession();
 </script>

@@ -48,3 +48,10 @@ def log_hand(con, sid, q, position, stack, eq, required, suggested, taken, resul
         (sid, time.time(), " ".join(q.hole), " ".join(q.board), q.pot, q.call, q.opponents,
          q.range_pct, position, stack, eq, required, suggested, taken, result))
     con.commit()
+
+
+def clear_history(con):
+    """Permanently delete every saved session and hand."""
+    con.execute("DELETE FROM hands")
+    con.execute("DELETE FROM sessions")
+    con.commit()

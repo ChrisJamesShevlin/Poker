@@ -87,3 +87,19 @@ def test_service_auto_range():
     r = evaluate(dict(hole=["Ah", "Kd"], board=["Qc", "7h", "2d"], pot=1000, call=400,
                       opps=1, range_mode="auto"), sims=2000)
     assert r["range_label"].startswith("Auto: ") and r["range_pct_used"]
+
+
+def test_history_persists_and_clears(tmp_path):
+    path = tmp_path / "p.db"
+    con = store.connect(path)
+    sid = store.start_session(con, 1000, 500, 20)
+    q = Query(["Ah", "Kd"], [], 60, 40, 1, None)
+    store.log_hand(con, sid, q, "BTN", 500, 0.5, 0.4, "CALL", "CALL", 100)
+    store.end_session(con, sid, 1100)
+    con.close()
+    con = store.connect(path)  # fresh connection = app restart
+    s = analytics.summary(con)
+    assert s["hands"] == 1 and s["sessions"] == 1 and s["total_pl"] == 100
+    store.clear_history(con)
+    s = analytics.summary(con)
+    assert s["hands"] == 0 and s["sessions"] == 0 and store.open_session(con) is None
