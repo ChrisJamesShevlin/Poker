@@ -248,9 +248,12 @@
     coach = { state: 'loading', text: '', at: null }; build(last);
     try {
       const r = await fetch('/api/coach', { method: 'POST' });
-      const d = await r.json();
+      let d;
+      try { d = await r.json(); } catch (e) {
+        d = { ok: false, text: 'The server sent an unexpected reply (it may be running an older version). Stop it with Ctrl+C, run python3 server.py again, and reload this page.' };
+      }
       coach = d.ok ? { state: 'done', text: d.text, at: new Date().toLocaleString() } : { state: 'error', text: d.text || 'The coach could not answer.', at: null };
-    } catch (e) { coach = { state: 'error', text: 'Could not reach the server.', at: null }; }
+    } catch (e) { coach = { state: 'error', text: 'Could not reach the server - check that python3 server.py is still running in your terminal.', at: null }; }
     build(last);
   }
 
