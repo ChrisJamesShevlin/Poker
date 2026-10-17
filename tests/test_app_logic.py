@@ -103,3 +103,42 @@ def test_history_persists_and_clears(tmp_path):
     store.clear_history(con)
     s = analytics.summary(con)
     assert s["hands"] == 0 and s["sessions"] == 0 and store.open_session(con) is None
+
+
+def test_deposits_are_not_winnings(tmp_path):
+    con = store.connect(tmp_path / "d.db")
+    a = store.start_session(con, 1000, 500, 20)
+    store.end_session(con, a, 800)                       # lost 200
+    b = store.start_session(con, 5800, 500, 20, deposit_before=5000)  # topped up 5000 -> 5800
+    store.end_session(con, b, 6600, deposit_during=300)  # +800 on the balance, 300 of it a deposit
+    s = analytics.summary(con)
+    assert s["session_pl"] == [-200, 500]
+    assert s["total_pl"] == 300
+    assert s["balance_points"] == [1000, 800, 6600]
+    assert s["balance_ex_deposits"] == [1000, 800, 1300]
+    assert s["total_deposits"] == 5300
+
+def test_rolling_and_breakdowns(tmp_path):
+    con = store.connect(tmp_path / "r.db")
+    sid = store.start_session(con, 1000, 500, 20)
+    for i in range(12):
+        q = Query(["Ah", "Kd"], ["2c", "7h", "9d"] if i % 2 else [], 100, 20, 1, None)
+        store.log_hand(con, sid, q, "BTN" if i % 2 else "UTG", 500, 0.5, 0.2, "CALL", "CALL",
+                       50 if i % 3 else -20)
+    store.end_session(con, sid, 1100)
+    s = analytics.summary(con)
+    assert len(s["win_rate_roll"]) == 12 and s["win_rate_roll"][0] is None and s["win_rate_roll"][-1] is not None
+    assert {p["name"] for p in s["by_position"]} == {"BTN", "UTG"}
+    assert {p["name"] for p in s["by_street"]} == {"Preflop", "Flop"}
+    assert s["per_session"][0]["hands"] == 12 and s["ev_calls"] > 0
+
+
+def test_advice_split(tmp_path):
+    con = store.connect(tmp_path / "a.db")
+    sid = store.start_session(con, 1000, 500, 20)
+    q = Query(["Ah", "Kd"], [], 60, 40, 1, None)
+    store.log_hand(con, sid, q, "BTN", 500, 0.5, 0.4, "CALL", "CALL", 100)
+    store.log_hand(con, sid, q, "BTN", 500, 0.5, 0.4, "CALL", "FOLD", -40)
+    s = analytics.summary(con)
+    by = {r["name"]: r for r in s["advice_split"]}
+    assert by["Followed the suggestion"]["avg"] == 100 and by["Did something else"]["net"] == -40

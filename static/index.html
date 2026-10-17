@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Poker Study Tool</title>
+<link rel="stylesheet" href="/static/analytics.css">
 <style>
 :root{
   --bg:#0e1318; --panel:#171f27; --panel2:#1f2933; --line:#2b3947; --text:#e8eef4; --dim:#8da0b3;
@@ -73,12 +74,6 @@ input:focus{outline:2px solid var(--blue);outline-offset:-1px}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(380px,92vw)}
 dialog::backdrop{background:#000a}
 dialog .field{margin-bottom:10px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-.stat .v{font-size:24px;font-weight:700}.stat .k{font-size:12px;color:var(--dim)}
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:860px){.charts{grid-template-columns:1fr}}
-.chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;height:280px}
 .hidden{display:none}
 </style>
 </head>
@@ -150,19 +145,7 @@ dialog .field{margin-bottom:10px}
  </div>
 </section>
 
-<section id="analytics" class="hidden">
-  <div class="logrow" style="justify-content:flex-end;margin-bottom:12px">
-    <button class="btn ghost" id="clearHist" style="color:var(--bad)">Clear history</button>
-  </div>
-  <div class="stats" id="statCards"></div>
-  <div class="charts">
-    <div class="chart"><canvas id="c1"></canvas></div>
-    <div class="chart"><canvas id="c2"></canvas></div>
-    <div class="chart"><canvas id="c3"></canvas></div>
-    <div class="chart"><canvas id="c4"></canvas></div>
-  </div>
-  <div class="foot">Only hands you save are counted. Small samples are noisy.</div>
-</section>
+<section id="analytics" class="hidden"><div id="anRoot"></div></section>
 </main>
 
 <dialog id="sessDlg">
@@ -172,9 +155,11 @@ dialog .field{margin-bottom:10px}
       <div class="field"><label>Balance (total chips)</label><input id="sBal" type="number"></div>
       <div class="field"><label>Buy-in</label><input id="sBuy" type="number"></div>
       <div class="field"><label>Big blind</label><input id="sBB" type="number"></div>
+      <div class="field"><label>Of this balance, a top-up you deposited (0 if none)</label><input id="sDep" type="number" value="0" min="0"></div>
     </div>
     <div id="endFields" class="hidden">
       <div class="field"><label>Total balance now</label><input id="eBal" type="number"></div>
+      <div class="field"><label>Top-up deposited during this session (0 if none)</label><input id="eDep" type="number" value="0" min="0"></div>
     </div>
     <div class="logrow" style="margin-top:12px">
       <button class="btn" id="dlgOk" value="ok">OK</button>
@@ -184,6 +169,7 @@ dialog .field{margin-bottom:10px}
 </dialog>
 
 <script src="/static/chart.umd.min.js"></script>
+<script src="/static/analytics.js"></script>
 <script>
 const RANKS=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
 const SUITS=[['s','♠'],['h','♥'],['d','♦'],['c','♣']];
@@ -361,17 +347,20 @@ $('sessPill').onclick=()=>{
   $('dlgTitle').textContent=ending?'End session':'Start session';
   $('startFields').classList.toggle('hidden',ending);$('endFields').classList.toggle('hidden',!ending);
   if(!ending&&window.lastBalance!=null)$('sBal').value=window.lastBalance;
+  $('sDep').value=0;$('eDep').value=0;
   $('sessDlg').showModal();
 };
+$('sBal').oninput=()=>{ // a balance higher than last time is probably a top-up
+  if(window.lastBalance!=null){const d=(+$('sBal').value)-window.lastBalance;$('sDep').value=d>0?d:0}};
 $('sessForm').onsubmit=async e=>{
   if(e.submitter&&e.submitter.value!=='ok')return;
   const h={'Content-Type':'application/json'};
   if(session){
     if($('eBal').value==='')return;
-    await fetch('/api/session/end',{method:'POST',headers:h,body:JSON.stringify({balance_after:+$('eBal').value})});
+    await fetch('/api/session/end',{method:'POST',headers:h,body:JSON.stringify({balance_after:+$('eBal').value,deposit:+$('eDep').value||0})});
   }else{
     if(!$('sBal').value||!$('sBuy').value||!$('sBB').value)return;
-    await fetch('/api/session/start',{method:'POST',headers:h,body:JSON.stringify({balance:+$('sBal').value,buy_in:+$('sBuy').value,bb:+$('sBB').value})});
+    await fetch('/api/session/start',{method:'POST',headers:h,body:JSON.stringify({balance:+$('sBal').value,buy_in:+$('sBuy').value,bb:+$('sBB').value,deposit:+$('sDep').value||0})});
   }
   await loadSession();schedule();
 };
@@ -383,40 +372,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   $('analytics').classList.toggle('hidden',t.dataset.tab!=='analytics');
   if(t.dataset.tab==='analytics')loadAnalytics();
 });
-let charts=[];
-async function loadAnalytics(){
-  const s=await (await fetch('/api/analytics')).json();
-  const pct=v=>v==null?'n/a':(v*100).toFixed(0)+'%';
-  const cards=[
-    ['Sessions',s.sessions],['Hands saved',s.hands],
-    ['Session P/L',(s.total_pl>=0?'+':'')+Math.round(s.total_pl).toLocaleString()],
-    ['bb / 100',s.bb_per_100==null?'n/a':(s.bb_per_100>=0?'+':'')+s.bb_per_100.toFixed(1)],
-    ['Preflop VPIP',pct(s.vpip)],
-    ['Calls below break-even',`${s.bad_calls} / ${s.call_margins.length}`],
-    ['Followed suggestion',pct(s.follow_rate)]];
-  $('statCards').innerHTML=cards.map(([k,v])=>`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
-  charts.forEach(c=>c.destroy());charts=[];
-  const grid='#2b3947',tick='#8da0b3';
-  const base=t=>({responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false},title:{display:true,text:t,color:'#e8eef4'}},
-    scales:{x:{ticks:{color:tick},grid:{color:grid}},y:{ticks:{color:tick},grid:{color:grid}}}});
-  const idx=a=>a.map((_,i)=>i+1);
-  charts.push(new Chart($('c1'),{type:'line',data:{labels:s.balance_points.map((_,i)=>i===0?'start':'S'+i),
-    datasets:[{data:s.balance_points,borderColor:'#3b82f6',tension:.2}]},options:base('Balance after each session')}));
-  charts.push(new Chart($('c2'),{type:'line',data:{labels:idx(s.cum_results),
-    datasets:[{data:s.cum_results,borderColor:'#22c55e',pointRadius:0,tension:.15}]},options:base('Cumulative hand results (chips)')}));
-  charts.push(new Chart($('c3'),{type:'bar',data:{labels:idx(s.call_margins),
-    datasets:[{data:s.call_margins.map(x=>x*100),backgroundColor:s.call_margins.map(x=>x<-0.02?'#ef4444':'#22c55e')}]},
-    options:base('Each call: equity minus break-even (%)')}));
-  charts.push(new Chart($('c4'),{type:'bar',data:{labels:Object.keys(s.action_counts),
-    datasets:[{data:Object.values(s.action_counts),backgroundColor:'#3b82f6'}]},options:base('Actions taken')}));
-}
 
-$('pot').oninput=$('call').oninput=$('stack').oninput=schedule;
-$('stack').value=store.get('stack','')||'';$('stack').addEventListener('input',()=>store.set('stack',$('stack').value));
-$('clearHist').onclick=async()=>{
-  if(!confirm('Clear ALL saved history?\n\nThis permanently deletes every saved session and hand, and the analytics start from zero. It cannot be undone.'))return;
-  await fetch('/api/history/clear',{method:'POST'});await loadSession();loadAnalytics()};
 $('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
 buildControls();renderAll();loadSession();
 </script>

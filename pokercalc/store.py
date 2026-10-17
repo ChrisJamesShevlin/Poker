@@ -8,7 +8,8 @@ DB = Path(__file__).resolve().parent.parent / "poker.db"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions(
   id INTEGER PRIMARY KEY, start_ts REAL, end_ts REAL,
-  balance_before REAL, buy_in REAL, bb REAL, balance_after REAL);
+  balance_before REAL, buy_in REAL, bb REAL, balance_after REAL,
+  deposit_before REAL DEFAULT 0, deposit_during REAL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS hands(
   id INTEGER PRIMARY KEY, session_id INTEGER, ts REAL,
   hole TEXT, board TEXT, pot REAL, call REAL, opps INTEGER, range_pct INTEGER,
@@ -21,19 +22,25 @@ def connect(path=DB):
     con = sqlite3.connect(str(path))
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(sessions)")}
+    for c in ("deposit_before", "deposit_during"):  # upgrade older databases
+        if c not in cols:
+            con.execute(f"ALTER TABLE sessions ADD COLUMN {c} REAL DEFAULT 0")
+    con.commit()
     return con
 
 
-def start_session(con, balance_before, buy_in, bb):
-    cur = con.execute("INSERT INTO sessions(start_ts,balance_before,buy_in,bb) VALUES(?,?,?,?)",
-                      (time.time(), balance_before, buy_in, bb))
+def start_session(con, balance_before, buy_in, bb, deposit_before=0.0):
+    """balance_before already includes any top-up; deposit_before says how much of it was a deposit."""
+    cur = con.execute("INSERT INTO sessions(start_ts,balance_before,buy_in,bb,deposit_before) VALUES(?,?,?,?,?)",
+                      (time.time(), balance_before, buy_in, bb, deposit_before))
     con.commit()
     return cur.lastrowid
 
 
-def end_session(con, sid, balance_after):
-    con.execute("UPDATE sessions SET end_ts=?, balance_after=? WHERE id=?",
-                (time.time(), balance_after, sid))
+def end_session(con, sid, balance_after, deposit_during=0.0):
+    con.execute("UPDATE sessions SET end_ts=?, balance_after=?, deposit_during=? WHERE id=?",
+                (time.time(), balance_after, deposit_during, sid))
     con.commit()
 
 

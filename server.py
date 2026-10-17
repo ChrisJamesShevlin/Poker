@@ -39,7 +39,8 @@ def session():
 @app.post("/api/session/start")
 def session_start():
     d = request.get_json()
-    sid = store.start_session(db(), float(d["balance"]), float(d["buy_in"]), float(d["bb"]))
+    sid = store.start_session(db(), float(d["balance"]), float(d["buy_in"]), float(d["bb"]),
+                              float(d.get("deposit") or 0))
     return jsonify(id=sid)
 
 
@@ -48,7 +49,8 @@ def session_end():
     con = db()
     row = store.open_session(con)
     if row:
-        store.end_session(con, row["id"], float(request.get_json()["balance_after"]))
+        d = request.get_json()
+        store.end_session(con, row["id"], float(d["balance_after"]), float(d.get("deposit") or 0))
     return jsonify(ok=True)
 
 
