@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poker Study Tool</title>
+<style>
+:root{
+  --bg:#0e1318; --panel:#171f27; --panel2:#1f2933; --line:#2b3947; --text:#e8eef4; --dim:#8da0b3;
+  --felt:#0f4d2a; --felt2:#0b3a20; --good:#22c55e; --bad:#ef4444; --blue:#3b82f6; --amber:#f59e0b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+.tabs{display:flex;gap:4px;margin-left:12px}
+.tab{background:none;border:0;color:var(--dim);padding:7px 14px;border-radius:8px;font:inherit;cursor:pointer}
+.tab.on{background:var(--panel2);color:var(--text)}
+.pill{margin-left:auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+.pill.live{border-color:var(--good)}
+main{max-width:1040px;margin:0 auto;padding:16px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.table{background:radial-gradient(ellipse at center,var(--felt) 0%,var(--felt2) 100%);border-radius:14px;padding:16px 12px;border:1px solid #0a2e19}
+.row{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9fd8b3;text-align:center;margin:8px 0 6px}
+.slot{width:54px;height:76px;border-radius:8px;border:2px dashed #ffffff40;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:#00000022;font-weight:700;position:relative}
+.slot.big{width:62px;height:88px}
+.slot.next{border-color:#fde047;box-shadow:0 0 0 3px #fde04755}
+.slot.full{background:#fff;border:2px solid #222;color:#111}
+.slot .r{font-size:24px;line-height:1}.slot .s{font-size:26px;line-height:1.1}
+.s-s{color:#111}.s-h{color:#d32f2f}.s-d{color:#1976d2}.s-c{color:#2e7d32}
+.picker{margin-top:12px}
+.prow{display:grid;grid-template-columns:repeat(13,1fr);gap:4px;margin-bottom:4px}
+.pk{aspect-ratio:3/4;border:0;border-radius:6px;background:#fff;font:700 15px/1 system-ui;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}
+.pk span{font-size:15px}
+.pk:hover{outline:2px solid #fde047}
+.pk.used{opacity:.18;cursor:pointer}
+.hint{font-size:12px;color:var(--dim);margin-top:6px;text-align:center}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-bottom:4px}
+.field.wide{grid-column:1/-1}
+input[type=number],input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:8px;font:inherit;font-size:16px}
+input:focus{outline:2px solid var(--blue);outline-offset:-1px}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{flex:1;min-width:34px;background:var(--panel2);border:1px solid var(--line);color:var(--dim);padding:8px 6px;border-radius:8px;font:inherit;cursor:pointer}
+.seg button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.result{min-height:300px}
+.action{font-size:54px;font-weight:800;letter-spacing:1px;line-height:1}
+.a-FOLD{color:var(--bad)}.a-CALL{color:var(--blue)}.a-RAISE,.a-BET{color:var(--good)}.a-CHECK{color:var(--dim)}
+.why{color:var(--dim);margin:6px 0 12px}
+.bar{position:relative;height:16px;background:var(--panel2);border-radius:8px;overflow:visible;margin:10px 0 4px}
+.bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;background:var(--good);transition:width .15s}
+.bar>b{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--amber)}
+.bartxt{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+.big{font-size:30px;font-weight:700}
+.kv{margin:10px 0 0;padding:0;list-style:none;color:var(--text)}
+.kv li{padding:5px 0;border-top:1px solid var(--line)}
+.kv .k{color:var(--dim);display:inline-block;min-width:92px}
+.warn{color:var(--amber);font-size:12.5px;margin-top:8px}
+.foot{color:var(--dim);font-size:12px;margin-top:14px}
+.log{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.log .seg{margin-bottom:8px}
+.btn{background:var(--blue);border:0;color:#fff;padding:10px 16px;border-radius:9px;font:inherit;font-weight:650;cursor:pointer}
+.btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+.logrow{display:flex;gap:8px}
+.logrow input{flex:1}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(380px,92vw)}
+dialog::backdrop{background:#000a}
+dialog .field{margin-bottom:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat .v{font-size:24px;font-weight:700}.stat .k{font-size:12px;color:var(--dim)}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.charts{grid-template-columns:1fr}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;height:280px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Poker Study Tool</h1>
+  <div class="tabs">
+    <button class="tab on" data-tab="hand">Hand</button>
+    <button class="tab" data-tab="analytics">Analytics</button>
+  </div>
+  <button class="pill" id="sessPill">No session</button>
+</header>
+
+<main>
+<section id="hand">
+ <div class="grid">
+  <div>
+    <div class="table">
+      <div class="lbl">Your cards</div>
+      <div class="row" id="holeRow"></div>
+      <div class="lbl">Board</div>
+      <div class="row" id="boardRow"></div>
+    </div>
+    <div class="picker" id="picker"></div>
+    <div class="hint">Click cards, or type them: rank + suit (e.g. <b>a</b> <b>h</b>, <b>t</b> <b>s</b>). Backspace = undo, Esc = clear.</div>
+    <div class="card" style="margin-top:12px">
+      <div class="log" style="margin:0;padding:0;border:0">
+        <div class="seg" id="takenSeg"></div>
+        <div class="logrow">
+          <input id="result" type="number" inputmode="numeric" placeholder="Net chips won/lost (optional, e.g. -400)">
+          <button class="btn" id="saveBtn">Save &amp; next</button>
+          <button class="btn ghost" id="clearBtn">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card result" id="resultCard">
+      <div id="empty" style="color:var(--dim)">Pick your two cards to start.</div>
+      <div id="out" class="hidden">
+        <div class="action" id="action">-</div>
+        <div class="why" id="why"></div>
+        <div class="bartxt"><span>Your equity</span><span>Needed to call <b style="color:var(--amber)" id="reqTxt"></b></span></div>
+        <div class="bar"><i id="eqBar"></i><b id="reqMark"></b></div>
+        <div class="big" id="eqTxt"></div>
+        <ul class="kv" id="kv"></ul>
+        <div class="warn" id="warn"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="controls">
+        <div class="field"><label>Pot (total in middle)</label><input id="pot" type="number" inputmode="numeric" min="0"></div>
+        <div class="field"><label>Bet to call</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
+        <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
+        <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
+        <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
+        <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
+        <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
+      </div>
+    </div>
+    <div class="foot">Knows nothing about how your opponents play. Not a GTO solver. Simple rules of thumb for study only, play-money tables.</div>
+  </div>
+ </div>
+</section>
+
+<section id="analytics" class="hidden">
+  <div class="stats" id="statCards"></div>
+  <div class="charts">
+    <div class="chart"><canvas id="c1"></canvas></div>
+    <div class="chart"><canvas id="c2"></canvas></div>
+    <div class="chart"><canvas id="c3"></canvas></div>
+    <div class="chart"><canvas id="c4"></canvas></div>
+  </div>
+  <div class="foot">Only hands you save are counted. Small samples are noisy.</div>
+</section>
+</main>
+
+<dialog id="sessDlg">
+  <form method="dialog" id="sessForm">
+    <h3 style="margin-top:0" id="dlgTitle">Start session</h3>
+    <div id="startFields">
+      <div class="field"><label>Balance (total chips)</label><input id="sBal" type="number"></div>
+      <div class="field"><label>Buy-in</label><input id="sBuy" type="number"></div>
+      <div class="field"><label>Big blind</label><input id="sBB" type="number"></div>
+    </div>
+    <div id="endFields" class="hidden">
+      <div class="field"><label>Total balance now</label><input id="eBal" type="number"></div>
+    </div>
+    <div class="logrow" style="margin-top:12px">
+      <button class="btn" id="dlgOk" value="ok">OK</button>
+      <button class="btn ghost" value="cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/static/chart.umd.min.js"></script>
+<script>
+const RANKS=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const SUITS=[['s','♠'],['h','♥'],['d','♦'],['c','♣']];
+const POS=['UTG','HJ','CO','BTN','SB','BB'];
+const RANGES=[['Random',0],['Top 40%',40],['Top 25%',25],['Top 15%',15]];
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+             set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+let slots=Array(7).fill(null);          // 0,1 hole; 2..6 board
+let opps=store.get('opps',2), rangePct=store.get('range',40), pos=store.get('pos','BTN');
+let facing=false, taken=null, last=null, pendingRank=null, reqId=0, timer=null, session=null;
+
+/* ---------- segmented controls ---------- */
+function seg(id,items,get,set){
+  const el=$(id); el.innerHTML='';
+  items.forEach(([label,val])=>{
+    const b=document.createElement('button'); b.textContent=label;
+    b.className=get()===val?'on':''; b.onclick=()=>{set(val);seg(id,items,get,set);schedule()};
+    el.appendChild(b);
+  });
+}
+function buildControls(){
+  seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
+  seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
+  seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
+  seg('facingSeg',[['No raise yet',false],['Facing a raise',true]],()=>facing,v=>facing=v);
+  seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
+}
+
+/* ---------- cards ---------- */
+function cardEl(c,big){
+  const d=document.createElement('div');
+  d.className='slot'+(big?' big':'');
+  return d;
+}
+function renderSlots(){
+  const firstEmpty=slots.findIndex(x=>!x);
+  const make=(i,big)=>{
+    const d=cardEl(slots[i],big);
+    if(slots[i]){
+      const [r,s]=[slots[i][0],slots[i][1]];
+      d.classList.add('full');
+      d.innerHTML=`<div class="r s-${s}">${r==='T'?'10':r}</div><div class="s s-${s}">${SUITS.find(x=>x[0]===s)[1]}</div>`;
+    }
+    if(i===firstEmpty)d.classList.add('next');
+    d.onclick=()=>{slots[i]=null;compact();renderAll();schedule()};
+    return d;
+  };
+  const h=$('holeRow'),b=$('boardRow'); h.innerHTML='';b.innerHTML='';
+  [0,1].forEach(i=>h.appendChild(make(i,true)));
+  [2,3,4,5,6].forEach(i=>b.appendChild(make(i,false)));
+  // picker
+  const used=new Set(slots.filter(Boolean));
+  const p=$('picker'); p.innerHTML='';
+  SUITS.forEach(([s,g])=>{
+    const row=document.createElement('div'); row.className='prow';
+    RANKS.forEach(r=>{
+      const code=r+s, bt=document.createElement('button');
+      bt.className='pk s-'+s+(used.has(code)?' used':'');
+      bt.innerHTML=`${r==='T'?'10':r}<span>${g}</span>`;
+      bt.onclick=()=>toggle(code);
+      row.appendChild(bt);
+    });
+    p.appendChild(row);
+  });
+}
+function compact(){ // keep hole cards first, board cards contiguous
+  const hole=slots.slice(0,2).filter(Boolean), board=slots.slice(2).filter(Boolean);
+  slots=[...hole,...Array(2-hole.length).fill(null),...board,...Array(5-board.length).fill(null)];
+}
+function toggle(code){
+  const i=slots.indexOf(code);
+  if(i>=0){slots[i]=null;compact()}
+  else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
+  renderAll();schedule();
+}
+function renderAll(){renderSlots();$('facingWrap').classList.toggle('hidden',slots.slice(2).some(Boolean))}
+
+/* ---------- calculation ---------- */
+function state(){
+  return {hole:slots.slice(0,2).filter(Boolean), board:slots.slice(2).filter(Boolean),
+    pot:+$('pot').value||0, call:+$('call').value||0, opps, range_pct:rangePct||null,
+    position:pos, facing, stack:+$('stack').value||null, bb:session?session.bb:null};
+}
+function schedule(){clearTimeout(timer);timer=setTimeout(calc,120)}
+async function calc(){
+  const s=state(), ok=s.hole.length===2&&[0,3,4,5].includes(s.board.length);
+  if(!ok){
+    $('out').classList.add('hidden');$('empty').classList.remove('hidden');
+    $('empty').textContent=s.hole.length<2?'Pick your two cards to start.':
+      'Board needs a full flop (3 cards), turn or river.';
+    last=null;return;
+  }
+  const id=++reqId;
+  const r=await fetch('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
+  if(id!==reqId)return;
+  const d=await r.json(); if(d.error)return;
+  last={s,d}; taken=d.action; seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
+  show(d,s);
+}
+function show(d,s){
+  $('empty').classList.add('hidden');$('out').classList.remove('hidden');
+  $('action').textContent=d.action;$('action').className='action a-'+d.action;
+  $('why').textContent=d.why;
+  $('eqTxt').textContent=(d.equity*100).toFixed(1)+'% equity';
+  $('eqBar').style.width=(d.equity*100)+'%';
+  const showReq=s.call>0;
+  $('reqMark').style.display=showReq?'block':'none';
+  $('reqMark').style.left=(d.required*100)+'%';
+  $('reqTxt').textContent=showReq?(d.required*100).toFixed(1)+'%':'-';
+  const kv=[];
+  kv.push(['Win / tie',`${(d.win*100).toFixed(1)}% / ${(d.tie*100).toFixed(1)}%`]);
+  if(showReq){kv.push(['Pot odds',d.ratio]);kv.push(['Verdict',d.verdict])}
+  if(d.hand)kv.push(['Your hand',d.hand]);
+  if(d.outs)kv.push(['Outs',`${d.outs} (to two pair or better)`]);
+  if(d.rule24)kv.push(['Rule of 2/4',d.rule24]);
+  if(d.stack_line)kv.push(['Stack',d.stack_line.replace(/^Stack /,'')]);
+  if(d.preflop){kv.push(['Preflop',d.preflop.text]);if(d.preflop.note)kv.push(['Note',d.preflop.note])}
+  $('kv').innerHTML=kv.map(([k,v])=>`<li><span class="k">${k}</span>${v}</li>`).join('');
+  $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - pick a Top % range for a realistic view.':'';
+}
+
+/* ---------- save / clear ---------- */
+async function save(){
+  if(!last)return;
+  const b={...last.s,equity:last.d.equity,required:last.d.required,suggested:last.d.action,
+           taken,result:$('result').value};
+  await fetch('/api/hand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  clearHand(); toast('Saved');
+}
+function clearHand(){
+  slots=Array(7).fill(null);$('pot').value='';$('call').value='0';$('result').value='';
+  facing=false;taken=null;last=null;buildControls();renderAll();schedule();
+}
+function toast(t){const e=document.createElement('div');e.textContent=t;
+  Object.assign(e.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',background:'#22c55e',color:'#04210f',padding:'8px 16px',borderRadius:'8px',fontWeight:'700'});
+  document.body.appendChild(e);setTimeout(()=>e.remove(),1100)}
+
+/* ---------- keyboard entry ---------- */
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.ctrlKey||e.metaKey||e.altKey)return;
+  if($('sessDlg').open)return;
+  const k=e.key.toLowerCase();
+  if(k==='escape'){clearHand();return}
+  if(k==='backspace'){e.preventDefault();
+    if(pendingRank){pendingRank=null;return}
+    for(let i=6;i>=0;i--)if(slots[i]){slots[i]=null;compact();renderAll();schedule();break}return}
+  if('23456789tjqka'.includes(k)&&k.length===1){pendingRank=k.toUpperCase();return}
+  if('shdc'.includes(k)&&k.length===1&&pendingRank){const c=pendingRank+k;pendingRank=null;
+    if(!slots.includes(c))toggle(c);return}
+});
+
+/* ---------- session ---------- */
+async function loadSession(){
+  const r=await (await fetch('/api/session')).json();
+  session=r.active; window.lastBalance=r.last_balance;
+  const p=$('sessPill');
+  if(session){p.textContent=`Session live - buy-in ${session.buy_in.toLocaleString()} - BB ${session.bb}`;p.classList.add('live')}
+  else{p.textContent='Start session';p.classList.remove('live')}
+}
+$('sessPill').onclick=()=>{
+  const ending=!!session;
+  $('dlgTitle').textContent=ending?'End session':'Start session';
+  $('startFields').classList.toggle('hidden',ending);$('endFields').classList.toggle('hidden',!ending);
+  if(!ending&&window.lastBalance!=null)$('sBal').value=window.lastBalance;
+  $('sessDlg').showModal();
+};
+$('sessForm').onsubmit=async e=>{
+  if(e.submitter&&e.submitter.value!=='ok')return;
+  const h={'Content-Type':'application/json'};
+  if(session){
+    if($('eBal').value==='')return;
+    await fetch('/api/session/end',{method:'POST',headers:h,body:JSON.stringify({balance_after:+$('eBal').value})});
+  }else{
+    if(!$('sBal').value||!$('sBuy').value||!$('sBB').value)return;
+    await fetch('/api/session/start',{method:'POST',headers:h,body:JSON.stringify({balance:+$('sBal').value,buy_in:+$('sBuy').value,bb:+$('sBB').value})});
+  }
+  await loadSession();schedule();
+};
+
+/* ---------- tabs & analytics ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  $('hand').classList.toggle('hidden',t.dataset.tab!=='hand');
+  $('analytics').classList.toggle('hidden',t.dataset.tab!=='analytics');
+  if(t.dataset.tab==='analytics')loadAnalytics();
+});
+let charts=[];
+async function loadAnalytics(){
+  const s=await (await fetch('/api/analytics')).json();
+  const pct=v=>v==null?'n/a':(v*100).toFixed(0)+'%';
+  const cards=[
+    ['Sessions',s.sessions],['Hands saved',s.hands],
+    ['Session P/L',(s.total_pl>=0?'+':'')+Math.round(s.total_pl).toLocaleString()],
+    ['bb / 100',s.bb_per_100==null?'n/a':(s.bb_per_100>=0?'+':'')+s.bb_per_100.toFixed(1)],
+    ['Preflop VPIP',pct(s.vpip)],
+    ['Calls below break-even',`${s.bad_calls} / ${s.call_margins.length}`],
+    ['Followed suggestion',pct(s.follow_rate)]];
+  $('statCards').innerHTML=cards.map(([k,v])=>`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+  charts.forEach(c=>c.destroy());charts=[];
+  const grid='#2b3947',tick='#8da0b3';
+  const base=t=>({responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},title:{display:true,text:t,color:'#e8eef4'}},
+    scales:{x:{ticks:{color:tick},grid:{color:grid}},y:{ticks:{color:tick},grid:{color:grid}}}});
+  const idx=a=>a.map((_,i)=>i+1);
+  charts.push(new Chart($('c1'),{type:'line',data:{labels:s.balance_points.map((_,i)=>i===0?'start':'S'+i),
+    datasets:[{data:s.balance_points,borderColor:'#3b82f6',tension:.2}]},options:base('Balance after each session')}));
+  charts.push(new Chart($('c2'),{type:'line',data:{labels:idx(s.cum_results),
+    datasets:[{data:s.cum_results,borderColor:'#22c55e',pointRadius:0,tension:.15}]},options:base('Cumulative hand results (chips)')}));
+  charts.push(new Chart($('c3'),{type:'bar',data:{labels:idx(s.call_margins),
+    datasets:[{data:s.call_margins.map(x=>x*100),backgroundColor:s.call_margins.map(x=>x<-0.02?'#ef4444':'#22c55e')}]},
+    options:base('Each call: equity minus break-even (%)')}));
+  charts.push(new Chart($('c4'),{type:'bar',data:{labels:Object.keys(s.action_counts),
+    datasets:[{data:Object.values(s.action_counts),backgroundColor:'#3b82f6'}]},options:base('Actions taken')}));
+}
+
+$('pot').oninput=$('call').oninput=$('stack').oninput=schedule;
+$('stack').value=store.get('stack','')||'';$('stack').addEventListener('input',()=>store.set('stack',$('stack').value));
+$('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
+buildControls();renderAll();loadSession();
+</script>
+</body>
+</html>
