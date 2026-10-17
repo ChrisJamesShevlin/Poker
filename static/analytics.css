@@ -7,7 +7,8 @@
 .an-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .an-head h2{margin:0;font-size:22px;font-weight:700;letter-spacing:-.2px}
 .an-head p{margin:2px 0 0;color:var(--a-muted);font-size:13px}
-.an-head .sp{flex:1}
+.an-head>div:first-child{flex:1 1 340px}
+.an-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .an-seg{display:inline-flex;background:var(--a-surface);border:1px solid var(--a-border);border-radius:10px;padding:3px}
 .an-seg button{background:none;border:0;color:var(--a-muted);padding:6px 14px;border-radius:7px;font:inherit;font-size:13px;cursor:pointer}
 .an-seg button.on{background:#26323e;color:var(--a-ink)}
@@ -54,3 +55,22 @@
 .an-tables th{text-align:left;color:var(--a-muted);font-weight:600;border-bottom:1px solid var(--a-base);padding:6px 8px}
 .an-tables td{padding:5px 8px;border-bottom:1px solid var(--a-hair);color:var(--a-ink2);font-variant-numeric:tabular-nums}
 .an-tables .scroll{max-height:260px;overflow:auto}
+
+.an-btn.primary{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:600}
+.an-btn.primary:hover{background:#5598e7;border-color:#5598e7;color:#fff}
+.an-btn:disabled{opacity:.6;cursor:default}
+.coach{margin-bottom:18px;border-color:#2d4a6e}
+.coach-head{display:flex;align-items:center;justify-content:space-between}
+.coach-x{background:none;border:0;color:var(--a-muted);font-size:16px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.coach-x:hover{background:#26323e;color:var(--a-ink)}
+.coach-body{margin-top:6px;max-width:78ch;color:var(--a-ink2);font-size:14.5px;line-height:1.6}
+.coach-body h4{margin:16px 0 4px;color:var(--a-ink);font-size:15px}
+.coach-body p{margin:6px 0}
+.coach-body ul{margin:4px 0 6px;padding-left:20px}
+.coach-body li{margin:4px 0}
+.coach-body strong{color:var(--a-ink)}
+.coach-body .dim{color:var(--a-muted)}
+.coach-body .err{color:var(--neg)}
+.coach-note{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--a-hair);color:var(--a-muted);font-size:12px}
+.spin{width:22px;height:22px;border:3px solid #26323e;border-top-color:var(--c1);border-radius:50%;animation:sp .8s linear infinite;margin:10px 0}
+@keyframes sp{to{transform:rotate(360deg)}}

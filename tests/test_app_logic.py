@@ -142,3 +142,25 @@ def test_advice_split(tmp_path):
     s = analytics.summary(con)
     by = {r["name"]: r for r in s["advice_split"]}
     assert by["Followed the suggestion"]["avg"] == 100 and by["Did something else"]["net"] == -40
+
+
+def test_coach_prompt_and_runner(tmp_path):
+    import json
+    from pokercalc import coach
+    con = store.connect(tmp_path / "c.db")
+    sid = store.start_session(con, 1000, 500, 20)
+    q = Query(["Ah", "Kd"], ["2c", "7h", "9d"], 600, 200, 2, 25)
+    store.log_hand(con, sid, q, "BTN", 500, 0.31, 0.25, "CALL", "CALL", -200)
+    store.end_session(con, sid, 800)
+    prompt = coach.build_prompt(con)
+    assert "STATS:" in prompt and "RECENT HANDS" in prompt and "Ah Kd" in prompt and "net_result_chips" in prompt
+    json.loads(prompt.split("STATS:\n")[1].split("\n\nRECENT")[0])  # stats block is valid JSON
+
+    class Fake:
+        returncode, stdout, stderr = 0, "## Overall picture\nok", ""
+    seen = {}
+    def runner(cmd, **kw):
+        seen["cmd"], seen["kw"] = cmd, kw
+        return Fake()
+    ok, text = coach.run_coach("hi", runner=runner)
+    assert ok and text.startswith("## Overall") and "--tools" in seen["cmd"] and seen["kw"]["input"] == "hi"

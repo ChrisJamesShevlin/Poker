@@ -18,6 +18,7 @@
   const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let charts = [], view = get('anView', 'charts'), last = null;
+  let coach = { state: 'idle', text: '', at: null };  // idle | loading | done | error
 
   /* ---------- chart plugins ---------- */
   const crosshair = {
@@ -134,13 +135,14 @@
     const head = el('div', 'an-head');
     const t = el('div'); t.appendChild(el('h2', null, 'Analytics'));
     t.appendChild(el('p', null, 'Everything you save is stored and counted here, across all sessions. Top-ups are never counted as winnings.'));
-    head.appendChild(t); head.appendChild(el('div', 'sp'));
+    head.appendChild(t);
+    const acts = el('div', 'an-actions');
     const seg = el('div', 'an-seg');
     [['charts', 'Charts'], ['tables', 'Tables']].forEach(([k, label]) => {
       const b = el('button', view === k ? 'on' : '', label); b.onclick = () => { view = k; put('anView', k); build(last); };
       seg.appendChild(b);
     });
-    head.appendChild(seg);
+    acts.appendChild(seg);
     const clr = el('button', 'an-btn', 'Clear history');
     clr.onclick = async () => {
       if (!confirm('Clear ALL saved history?\n\nThis permanently deletes every saved session and hand, and the analytics start from zero. It cannot be undone.')) return;
@@ -148,8 +150,13 @@
       if (window.loadSession) await window.loadSession();
       load();
     };
-    head.appendChild(clr);
+    const cb = el('button', 'an-btn primary', coach.state === 'loading' ? 'Coach is thinking\u2026' : 'Coach analysis');
+    cb.disabled = coach.state === 'loading'; cb.onclick = runCoach;
+    acts.appendChild(cb);
+    acts.appendChild(clr);
+    head.appendChild(acts);
     root.appendChild(head);
+    if (coach.state !== 'idle') root.appendChild(coachPanel());
 
     // hero + tiles
     const top = el('div', 'an-top');
@@ -194,6 +201,57 @@
 
     if (view === 'tables') { tables(root, s); return; }
     charts_(root, s);
+  }
+
+  /* ---------- coach analysis (LLM) ---------- */
+  function inline(parent, text) {  // **bold** only; everything else stays plain text
+    text.split(/(\*\*[^*]+\*\*)/).forEach(part => {
+      if (/^\*\*[^*]+\*\*$/.test(part)) parent.appendChild(el('strong', null, part.slice(2, -2)));
+      else if (part) parent.appendChild(document.createTextNode(part));
+    });
+  }
+  function renderMarkdown(box, md) {
+    let ul = null;
+    md.split('\n').forEach(raw => {
+      const line = raw.trimEnd();
+      let m;
+      if (!line.trim()) { ul = null; return; }
+      if ((m = line.match(/^#{1,4}\s+(.*)/))) { ul = null; box.appendChild(el('h4', null, m[1])); return; }
+      if ((m = line.match(/^\s*(?:[-*\u2022]|\d+[.)])\s+(.*)/))) {
+        if (!ul) { ul = el('ul'); box.appendChild(ul); }
+        const li = el('li'); inline(li, m[1]); ul.appendChild(li); return;
+      }
+      ul = null; const p = el('p'); inline(p, line); box.appendChild(p);
+    });
+  }
+  function coachPanel() {
+    const c = el('div', 'an-card coach');
+    const h = el('div', 'coach-head');
+    h.appendChild(el('h3', null, 'Coach analysis'));
+    const x = el('button', 'coach-x', '\u2715'); x.setAttribute('aria-label', 'Close'); x.onclick = () => { coach.state = 'idle'; build(last); };
+    h.appendChild(x); c.appendChild(h);
+    const body = el('div', 'coach-body');
+    if (coach.state === 'loading') {
+      body.appendChild(el('div', 'spin'));
+      body.appendChild(el('p', 'dim', 'Reading your stats and recent hands. This can take up to a minute.'));
+    } else if (coach.state === 'error') {
+      body.appendChild(el('p', 'err', coach.text));
+    } else {
+      renderMarkdown(body, coach.text);
+    }
+    c.appendChild(body);
+    if (coach.state === 'done') c.appendChild(el('p', 'coach-note',
+      `AI-generated from your saved stats and last 30 hands (${coach.at}). Treat it as a study prompt, not a verdict - small samples are noisy and the equity numbers rest on assumed opponent ranges.`));
+    return c;
+  }
+  async function runCoach() {
+    coach = { state: 'loading', text: '', at: null }; build(last);
+    try {
+      const r = await fetch('/api/coach', { method: 'POST' });
+      const d = await r.json();
+      coach = d.ok ? { state: 'done', text: d.text, at: new Date().toLocaleString() } : { state: 'error', text: d.text || 'The coach could not answer.', at: null };
+    } catch (e) { coach = { state: 'error', text: 'Could not reach the server.', at: null }; }
+    build(last);
   }
 
   function insights(s) {

@@ -4,7 +4,7 @@ import webbrowser
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from pokercalc import analytics, service, store
+from pokercalc import analytics, coach, service, store
 from pokercalc.parser import Query
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -72,6 +72,15 @@ def hand():
 def history_clear():
     store.clear_history(db())
     return jsonify(ok=True)
+
+
+@app.post("/api/coach")
+def coach_api():
+    con = db()
+    if not con.execute("SELECT 1 FROM hands LIMIT 1").fetchone():
+        return jsonify(ok=False, text="Save a few hands first - the coach needs something to look at."), 400
+    ok, text = coach.run_coach(coach.build_prompt(con))
+    return jsonify(ok=ok, text=text), (200 if ok else 502)
 
 
 @app.get("/api/analytics")
