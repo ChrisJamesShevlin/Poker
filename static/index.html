@@ -106,7 +106,7 @@ dialog .field{margin-bottom:10px}
       <div class="log" style="margin:0;padding:0;border:0">
         <div class="lbl" style="text-align:left;margin-top:0">What did you do?</div>
         <div class="seg" id="takenSeg"></div>
-        <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="Amount"><button class="btn" id="amtOk">Confirm</button></div>
+        <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="Pot won (optional)"><button class="btn" id="amtOk">Confirm</button></div>
         <div class="logrow">
           <input id="result" type="number" inputmode="numeric" min="0" placeholder="Amount">
           <button class="btn won" id="wonBtn">Won</button>
@@ -383,7 +383,7 @@ async function commit(a,amt){
   const verb={CHECK:'checked',CALL:'called',BET:'bet',RAISE:'raised to'}[a];
   $('empty').innerHTML=`<b style="color:var(--text)">You ${verb}${amt?' '+amt.toLocaleString():''}.</b> Pot ${(+$('pot').value||0).toLocaleString()}`+
     ($('stack').value?`, stack ${(+$('stack').value).toLocaleString()}`:'')+
-    `.<br><br>Next: add a card or their bet. Hand over? Enter the amount, then Won or Lost.`;
+    `.<br><br>Next: add a card or their bet. Hand over? Press Won or Lost.`;
 }
 function confirmAmt(){const v=+$('amt').value;if(!v)return;commit(pendingAct,v)}
 $('amtOk').onclick=confirmAmt;
@@ -484,10 +484,11 @@ $('bbIn').value=store.get('bb','');$('stack').value=store.get('stack','');
   schedule()}));  // typing must recalculate, not just the buttons
 function finish(sign){
   if(!last){toast('Pick your cards first');return}
-  let v=Math.abs(+$('result').value||0);
-  if(!v&&sign<0)v=contrib;          // 'Lost' with no amount = what you put in
-  if(!v){$('result').focus();return}
-  save(sign*v);
+  const typed=Math.abs(+$('result').value||0);
+  // Won: you're paid the pot (typed, or the tracked one); your profit is that minus what you put in.
+  // Lost: you lose what you put in (or the typed amount).
+  const res=sign>0?(typed||+$('pot').value||0)-contrib:-(typed||contrib);
+  save(res);
 }
 $('wonBtn').onclick=()=>finish(1);$('lostBtn').onclick=()=>finish(-1);$('clearBtn').onclick=()=>clearHand(true);
 buildControls();renderAll();loadSession().then(()=>{prefillPot();renderAll();schedule()});
