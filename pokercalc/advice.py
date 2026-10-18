@@ -100,6 +100,9 @@ def suggest_postflop(eq, pot, call, opps, stack=None, position="BTN", board=(), 
         raise_to = call * (3.0 if edge >= 0 else 3.5)
         commits = stack is not None and raise_to >= 0.6 * stack
         size = _size(raise_to, pot, stack) if not commits else f"all-in ({_chips(stack):,})"
+        if wet and hold.get("made") == "Pair" and eq >= strong + 0.05:
+            return "CALL", (f"{eq:.0%} equity beats the {req:.0%} you need, but one pair on a board where someone "
+                            f"can have a straight or flush: call, don't raise - a raise is mostly called by hands that beat you"), None
         if eq >= strong + 0.05:
             return "RAISE", (f"{eq:.0%} equity is well ahead of what you need ({req:.0%}) and clears the "
                              f"{strong:.0%} line ({where}): raise for value" +

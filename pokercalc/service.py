@@ -6,6 +6,11 @@ from .parser import Query
 from .potodds import pot_odds, verdict
 
 
+def _wet(board):
+    t = " ".join(describe.board_texture(board)) if len(board) >= 3 else ""
+    return "flush" in t or "straight" in t
+
+
 def _preflop_sizing(position, facing, tier, call, bb, stack, rinfo):
     """How much to raise TO. Open 2.5bb (3bb from the blinds/early seats); 3-bet ~3x in position, ~4x out of it."""
     if tier == "shove" or (stack and bb and stack / bb < 25):
@@ -46,7 +51,7 @@ def evaluate(d, sims=20000):
     if mode == "auto":
         classes, rlabel, rpct = resolve(pot, call, len(board), d.get("raiser") or None,
                                         d.get("table") or "normal", bool(d.get("multi_street")),
-                                        extra_steps=steps)
+                                        extra_steps=steps, wet=_wet(board))
         rlabel = "Auto: " + rlabel
     elif mode:
         pct = int(mode)

@@ -319,3 +319,13 @@ def test_limped_pot_advice():
     d = evaluate(dict(hole=["Ah", "Ad"], board=[], pot=10, call=0, opps=3, range_mode="auto",
                       position="BTN", facing="limp", bb=4), sims=300)
     assert d["action"] == "RAISE" and "3.5bb" in d["sizing"]
+
+
+def test_one_pair_on_wet_board_calls_not_raises():
+    from pokercalc.service import evaluate
+    b = dict(hole=["Ts", "As"], board=["3h", "Tc", "8h", "9s"], pot=400, call=66, opps=1,
+             range_mode="auto", position="BTN", stack=843)
+    d = evaluate(b, sims=2000)
+    assert d["action"] == "CALL" and "Straight/flush" not in d["range_label"] and "tighter" in d["range_label"]
+    dry = evaluate({**b, "board": ["3h", "Tc", "8d", "Ks"]}, sims=2000)
+    assert "tighter" not in dry["range_label"]

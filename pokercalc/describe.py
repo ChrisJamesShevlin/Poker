@@ -225,5 +225,5 @@ def hold_summary(hole, board):
         nuts = "You have the best possible hand right now."
     else:
         nuts = f"Best possible hand right now: {made_hand_name(best_cards + board)}."
-    return {"title": title, "draws": info["draws"], "outs": info["outs"],
+    return {"made": info["made"], "title": title, "draws": info["draws"], "outs": info["outs"],
             "texture": board_texture(board), "ahead": ahead, "nuts": nuts}
