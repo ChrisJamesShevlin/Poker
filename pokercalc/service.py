@@ -6,6 +6,24 @@ from .parser import Query
 from .potodds import pot_odds, verdict
 
 
+def _preflop_sizing(position, facing, tier, call, bb, stack, rinfo):
+    """How much to raise TO. Open 2.5bb (3bb from the blinds/early seats); 3-bet ~3x in position, ~4x out of it."""
+    if tier == "shove" or (stack and bb and stack / bb < 25):
+        return f"all-in ({stack:,.0f})" if stack else "all-in"
+    oop = position in ("SB", "BB")
+    if not facing:
+        mult = 3.0 if position in ("UTG", "SB") else 2.5
+        return f"raise to ~{mult * bb:,.0f} ({mult:g}bb)" if bb else f"raise to ~{mult:g}x the big blind"
+    mult = 4.0 if oop else 3.0
+    if tier == "big":
+        mult = 2.2   # 4-bet
+    base = (call + (bb / 2 if position == "SB" else bb if position == "BB" else 0)) if bb else call
+    to = base * mult
+    if stack and to >= stack:
+        return f"all-in ({stack:,.0f})"
+    return f"raise to ~{to:,.0f} (about {mult:g}x their raise)"
+
+
 def evaluate(d, sims=20000):
     hole, board = d["hole"], d["board"]
     pot, call = float(d.get("pot") or 0), float(d.get("call") or 0)
@@ -16,7 +34,8 @@ def evaluate(d, sims=20000):
 
     # Preflop: the raise size is worked out from 'bet to call' alone
     rinfo = None if board else preflop.raise_info(call, bb, stack, position)
-    facing = bool(d.get("facing"))
+    facing = d.get("facing") is True
+    limp = d.get("facing") == "limp" or bool(rinfo and bb and rinfo["tier"] == "limp")
     if rinfo and (bb or rinfo["tier"] == "shove"):
         facing = rinfo["facing"]          # detected, so the toggle isn't needed
     tier = rinfo["tier"] if rinfo and facing else "normal"
@@ -55,7 +74,8 @@ def evaluate(d, sims=20000):
         action, why, sizing = advice.suggest_postflop(eq, pot, call, opps, stack, position, board, out["hold"])
     else:
         g = preflop.advise(hole, position, stack / bb if stack and bb else None, facing, tier,
-                           rinfo["raise_bb"] if rinfo else None, d.get("raiser") or None)
+                           rinfo["raise_bb"] if rinfo else None, d.get("raiser") or None,
+                           limpers=limp and not facing, opps=opps)
         out["preflop"] = {"text": g["text"], "why": g["why"]}
         if rinfo and rinfo["tier"] != "none":
             names = {"limp": "limped pot (no raise)", "normal": "normal-size raise",
@@ -65,6 +85,11 @@ def evaluate(d, sims=20000):
                        "tier": f"{preflop.tier(g['pct'])} hand, rank {g['rank']}/169 (top {g['pct']:.0f}%)",
                        "draws": [], "texture": [], "nuts": None, "ahead": None, "outs": None}
         action, why = g["action"], g["why"]
+        if action == "RAISE" and limp and not facing:
+            sizing = (f"raise to ~{3.5 * bb:,.0f} (3.5bb) plus {bb:,.0f} (1bb) for every limper" if bb
+                      else "raise to ~3.5x the big blind, plus 1 big blind for every limper")
+        elif action == "RAISE":
+            sizing = _preflop_sizing(position, facing, tier, call, bb, stack, rinfo)
         if call > 0 and action == "CALL" and eq < req - 0.02:
             out["preflop"]["note"] = f"Guide says call, but pot odds need {req:.0%} and you have {eq:.0%}."
     out["action"], out["why"], out["sizing"] = action, why, sizing

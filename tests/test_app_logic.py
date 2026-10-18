@@ -308,3 +308,14 @@ def test_big_blind_vs_raise_and_small_blind_rules():
     assert preflop.advise(["Ah", "As"], "BB", 100, True, "normal", 2.0, "CO")["action"] == "RAISE"
     assert preflop.advise(["Th", "Td"], "SB", 100, True, "normal", 2.0, "UTG")["action"] == "FOLD"    # SB never flats an early open
     assert preflop.advise(["Ah", "5h"], "SB", 100, True, "normal", 2.0, "UTG")["action"] == "RAISE"   # A5s is a 3-bet bluff
+
+
+def test_limped_pot_advice():
+    from pokercalc.service import evaluate
+    assert preflop.advise(["2s", "2h"], "BTN", 100, False, limpers=True, opps=4)["action"] == "CALL"   # set-mine, don't raise
+    assert preflop.advise(["Ah", "Ad"], "BTN", 100, False, limpers=True, opps=4)["action"] == "RAISE"  # isolate
+    assert preflop.advise(["7h", "2d"], "BTN", 100, False, limpers=True)["action"] == "FOLD"
+    assert preflop.advise(["7h", "2d"], "BB", 100, False, limpers=True)["action"] == "CHECK"
+    d = evaluate(dict(hole=["Ah", "Ad"], board=[], pot=10, call=0, opps=3, range_mode="auto",
+                      position="BTN", facing="limp", bb=4), sims=300)
+    assert d["action"] == "RAISE" and "3.5bb" in d["sizing"]

@@ -153,7 +153,7 @@ def raise_info(call, bb, stack, position):
     return {"raise_bb": raise_bb, "tier": tier, "facing": tier in ("normal", "big", "shove")}
 
 
-def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=None, raiser=None):
+def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=None, raiser=None, limpers=False, opps=1):
     cls = hole_class(*hole)
     rank = ranking().index(cls) + 1
     pct = percentile(cls)
@@ -166,6 +166,22 @@ def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=
             act, why = "RAISE", f"short stack: shove/call-shove range ~top {lim}% from {position} - this hand is in it"
         else:
             act, why = "FOLD", f"outside the ~top {lim}% short-stack range for {position}"
+    elif not facing_raise and limpers:
+        # limped pot: raise to isolate with strong hands, otherwise take a cheap flop with
+        # pairs and suited hands (they win big when they hit), fold the rest
+        iso = 10 if opps >= 4 else 18          # more players in = tighter raising range
+        chart = _trim(OPEN[position], stack_bb) if position != "BB" else set()
+        cheap = len(cls) == 2 or cls.endswith("s")
+        if pct <= iso:
+            act, why = "RAISE", f"limpers ahead: strong hand (top {iso}%), raise to isolate and build the pot"
+        elif cheap and (position == "BB" or cls in chart):
+            act, why = "CALL" if position != "BB" else "CHECK", \
+                (f"limpers ahead: {'small pair' if len(cls) == 2 else 'suited hand'} - see a cheap flop and "
+                 f"{'hope to flop a set' if len(cls) == 2 else 'hope to flop a flush or straight'}, don't raise")
+        elif position == "BB":
+            act, why = "CHECK", "limpers ahead; you see a free flop"
+        else:
+            act, why = "FOLD", "limpers ahead and this hand is too weak to play out of position or in a crowd"
     elif not facing_raise:
         if position == "BB":
             act, why = "CHECK", "nobody raised; you see a free flop"

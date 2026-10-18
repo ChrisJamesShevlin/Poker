@@ -31,7 +31,7 @@ main{max-width:1040px;margin:0 auto;padding:16px}
 .slot.next{border-color:#fde047;box-shadow:0 0 0 3px #fde04755}
 .slot.full{background:#fff;border:2px solid #222;color:#111}
 .slot .r{font-size:24px;line-height:1}.slot .s{font-size:26px;line-height:1.1}
-.s-s{color:#111}.s-h{color:#d32f2f}.s-d{color:#1976d2}.s-c{color:#2e7d32}
+.s-s{color:#111}.s-h{color:#d32f2f}.s-d{color:#d32f2f}.s-c{color:#111}
 .picker{margin-top:12px}
 .prow{display:grid;grid-template-columns:repeat(13,1fr);gap:4px;margin-bottom:4px}
 .pk{aspect-ratio:3/4;border:0;border-radius:6px;background:#fff;font:700 15px/1 system-ui;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}
@@ -131,7 +131,7 @@ dialog .field{margin-bottom:10px}
     <div class="card" style="margin-top:12px">
       <div class="controls">
         <div class="field"><label>Pot (total in middle)</label><input id="pot" type="number" inputmode="numeric" min="0"></div>
-        <div class="field"><label>Bet to call</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
+        <div class="field"><label>Bet to call (0 = nobody has bet, so you can check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
         <div class="field wide" id="betWrap"><label>Their bet, as a share of the pot (fills in Bet to call)</label><div class="seg" id="betSeg"></div></div>
         <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
         <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
@@ -215,7 +215,7 @@ function buildControls(){
   seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
-  seg('facingSeg',[['No raise yet',false],['Facing a raise',true]],()=>facing,v=>facing=v);
+  seg('facingSeg',[['No raise yet',false],['Limpers',"limp"],['Facing a raise',true]],()=>facing,v=>facing=v);
   seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
 }
 
@@ -266,7 +266,7 @@ function toggle(code){
   else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
   renderAll();schedule();
 }
-function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0||!!(session&&session.bb));$('multiWrap').classList.toggle('hidden',nb<4);$('betWrap').classList.toggle('hidden',nb<3)}
+function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0);$('multiWrap').classList.toggle('hidden',nb<4);$('betWrap').classList.toggle('hidden',nb<3)}
 
 /* ---------- calculation ---------- */
 function state(){
@@ -401,6 +401,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.tab==='analytics')loadAnalytics();
 });
 
+['pot','call','stack'].forEach(id=>$(id).addEventListener('input',schedule));  // typing must recalculate, not just the buttons
 $('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
 buildControls();renderAll();loadSession();
 </script>
