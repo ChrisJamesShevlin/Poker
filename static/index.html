@@ -279,13 +279,14 @@ function toggle(code){
   else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
   renderAll();schedule();
 }
-function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0);$('multiWrap').classList.toggle('hidden',nb<4);$('betWrap').classList.toggle('hidden',nb<3)}
+function bbKnown(){return !!(session?session.bb:(+$('bbIn').value||0))}  // with the big blind known, raises and limpers are read from the pot and bet
+function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0||bbKnown());$('multiWrap').classList.toggle('hidden',nb<4);$('betWrap').classList.toggle('hidden',nb<3)}
 
 /* ---------- calculation ---------- */
 function state(){
   return {hole:slots.slice(0,2).filter(Boolean), board:slots.slice(2).filter(Boolean),
     pot:+$('pot').value||0, call:+$('call').value||0, opps, range_mode:rangePct, raiser, table, multi_street:multi,
-    position:pos, facing, stack:+$('stack').value||null, bb:session?session.bb:(+$('bbIn').value||null)};
+    position:pos, facing:bbKnown()?false:facing, stack:+$('stack').value||null, bb:session?session.bb:(+$('bbIn').value||null)};
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(calc,120)}
 async function calc(){
@@ -453,12 +454,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 
 $('bbIn').value=store.get('bb','');$('stack').value=store.get('stack','');
 ['pot','call','stack','bbIn'].forEach(id=>$(id).addEventListener('input',()=>{
-  if(id==='bbIn'){store.set('bb',$(id).value);prefillPot()}
+  if(id==='bbIn'){store.set('bb',$(id).value);prefillPot();renderAll()}
   if(id==='stack'){store.set('stack',$(id).value);if(startStack!==null)startStack=(+$(id).value||0)+contrib}
   else waiting=false;
   schedule()}));  // typing must recalculate, not just the buttons
 $('saveBtn').onclick=save;$('clearBtn').onclick=()=>clearHand(true);
-buildControls();renderAll();loadSession().then(()=>{prefillPot();schedule()});
+buildControls();renderAll();loadSession().then(()=>{prefillPot();renderAll();schedule()});
 </script>
 </body>
 </html>

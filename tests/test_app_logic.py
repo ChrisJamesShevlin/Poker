@@ -329,3 +329,10 @@ def test_one_pair_on_wet_board_calls_not_raises():
     assert d["action"] == "CALL" and "Straight/flush" not in d["range_label"] and "tighter" in d["range_label"]
     dry = evaluate({**b, "board": ["3h", "Tc", "8d", "Ks"]}, sims=2000)
     assert "tighter" not in dry["range_label"]
+
+
+def test_limpers_detected_from_pot():
+    from pokercalc.service import evaluate
+    base = dict(hole=["2s", "2h"], board=[], opps=3, range_mode="auto", position="BTN", bb=4)
+    assert evaluate({**base, "pot": 6, "call": 0}, sims=200)["action"] == "RAISE"           # blinds only: open
+    assert evaluate({**base, "pot": 14, "call": 0}, sims=200)["action"] == "CALL"           # 2 limpers: set-mine

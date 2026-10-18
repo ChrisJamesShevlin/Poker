@@ -41,6 +41,8 @@ def evaluate(d, sims=20000):
     rinfo = None if board else preflop.raise_info(call, bb, stack, position)
     facing = d.get("facing") is True
     limp = d.get("facing") == "limp" or bool(rinfo and bb and rinfo["tier"] == "limp")
+    if not board and bb and not facing and not limp and (not rinfo or rinfo["tier"] in ("none", "limp")):
+        limp = round((pot - 1.5 * bb) / bb) >= 1      # the blinds are 1.5bb; every extra bb in the pot is a limper
     if rinfo and (bb or rinfo["tier"] == "shove"):
         facing = rinfo["facing"]          # detected, so the toggle isn't needed
     tier = rinfo["tier"] if rinfo and facing else "normal"
