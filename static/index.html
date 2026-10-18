@@ -137,7 +137,6 @@ dialog .field{margin-bottom:10px}
         <div class="field wide" id="betWrap"><label>Their bet, as a share of the pot (fills in Bet to call)</label><div class="seg" id="betSeg"></div></div>
         <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
         <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
-        <div class="field wide"><label>Who raised before the flop?</label><div class="seg" id="raiserSeg"></div></div>
         <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
         <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
         <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
@@ -215,7 +214,6 @@ function buildControls(){
   seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
   seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
   buildBetSeg();
-  seg('raiserSeg',RAISERS,()=>raiser,v=>raiser=v);
   seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
