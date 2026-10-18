@@ -139,6 +139,7 @@ dialog .field{margin-bottom:10px}
         <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
         <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
         <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
+        <div class="field"><label>Big blind (for raise amounts)</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
         <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
       </div>
@@ -272,7 +273,7 @@ function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).lengt
 function state(){
   return {hole:slots.slice(0,2).filter(Boolean), board:slots.slice(2).filter(Boolean),
     pot:+$('pot').value||0, call:+$('call').value||0, opps, range_mode:rangePct, raiser, table, multi_street:multi,
-    position:pos, facing, stack:+$('stack').value||null, bb:session?session.bb:null};
+    position:pos, facing, stack:+$('stack').value||null, bb:session?session.bb:(+$('bbIn').value||null)};
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(calc,120)}
 async function calc(){
@@ -401,7 +402,8 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.tab==='analytics')loadAnalytics();
 });
 
-['pot','call','stack'].forEach(id=>$(id).addEventListener('input',schedule));  // typing must recalculate, not just the buttons
+$('bbIn').value=store.get('bb','');
+['pot','call','stack','bbIn'].forEach(id=>$(id).addEventListener('input',()=>{if(id==='bbIn')store.set('bb',$(id).value);schedule()}));  // typing must recalculate, not just the buttons
 $('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
 buildControls();renderAll();loadSession();
 </script>
