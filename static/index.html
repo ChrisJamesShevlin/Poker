@@ -218,14 +218,25 @@ function buildBetSeg(){  // pot field is the TOTAL in the middle (bet included),
     el.appendChild(b);
   });
 }
-function updSeat(){$('posLbl').textContent='Seat: '+pos+'  (pick BTN / SB / BB once - it moves on after each saved hand)'}
+function updSeat(){$('posLbl').textContent='Seat: '+pos+'  (set it once; it moves on after each saved hand. Tap Seat to step through UTG / HJ / CO)'}
 function buildControls(){
   seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
   seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
   buildBetSeg();
   seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
-  seg('posSeg',['BTN','SB','BB'].map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v);const i=SEATS[tableSize].indexOf(v);if(i>=0){seatIdx=i;store.set('seat',i)};updSeat()});
+  // 'Seat' = any seat between the big blind and the button (UTG/HJ/CO); click it to step through them
+  const BLINDS=['BTN','SB','BB'];
+  seg('posSeg',[['Seat','MID'],['BTN','BTN'],['SB','SB'],['BB','BB']],()=>BLINDS.includes(pos)?pos:'MID',v=>{
+    const order=SEATS[tableSize];
+    if(v==='MID'){
+      const mids=order.filter((p,i)=>!BLINDS.includes(p));
+      if(!mids.length)return;
+      const cur=BLINDS.includes(pos)?-1:mids.indexOf(pos);
+      pos=mids[(cur+1)%mids.length];
+      seatIdx=order.indexOf(pos);   // first matching seat is fine for the override
+    }else{pos=v;seatIdx=Math.max(0,order.indexOf(v))}
+    store.set('pos',pos);store.set('seat',seatIdx);updSeat()});
   updSeat();
   seg('sizeSeg',[2,3,4,5,6,7,8,9].map(n=>[n,n]),()=>tableSize,v=>{
     tableSize=v;store.set('tsize',v);seatIdx=Math.min(seatIdx,SEATS[v].length-1);store.set('seat',seatIdx);
