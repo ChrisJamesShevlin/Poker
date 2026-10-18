@@ -67,25 +67,21 @@ def suggest_postflop(eq, pot, call, opps, stack=None, position="BTN", board=(), 
     if call <= 0:
         if eq >= strong + 0.15:
             frac = 0.75 if wet else 0.5
-            return "BET", (f"very strong ({eq:.0%} equity): bet big for value" +
-                           (" - the board is draw-heavy, so charge them" if wet else "")), _size(pot * frac, pot, stack)
+            return "BET", (f"Very strong ({eq:.0%}). Bet big." +
+                           (" Draws are out there, so make them pay." if wet else "")), _size(pot * frac, pot, stack)
         if eq >= strong:
             frac = 0.5 if wet else 0.33
             if drawing and hold.get("made") == "High Card":
-                return "BET", (f"{' + '.join(draws)} ({outs} outs): {eq:.0%} equity is already ahead of their range "
-                               f"({where}), so bet - you win now or when it hits"), _size(pot * (0.66 if wet else 0.5), pot, stack)
-            return "BET", (f"{eq:.0%} equity clears the {strong:.0%} value line ({where}): bet for value, "
-                           f"smaller size so worse hands can call"), _size(pot * frac, pot, stack)
+                return "BET", (f"{' + '.join(draws)} ({outs} outs) and already ahead ({eq:.0%}). Bet."), _size(pot * (0.66 if wet else 0.5), pot, stack)
+            return "BET", (f"{eq:.0%} equity: bet small for value so worse hands call"), _size(pot * frac, pot, stack)
         if drawing and opps <= 2 and (edge >= 0 or eq >= 0.30):
             frac = 0.66 if wet else 0.5
             what = " + ".join(draws)
-            return "BET", (f"semi-bluff: {what} ({outs} outs) with {eq:.0%} equity - you win if they fold "
-                           f"or if you hit"), _size(pot * frac, pot, stack)
+            return "BET", (f"semi-bluff: {what} ({outs} outs). You win if they fold or you hit"), _size(pot * frac, pot, stack)
         if drawing and opps <= 2:
-            return "CHECK", f"you have a draw ({outs} outs) but you're {where} - take a free card instead of bluffing", None
-        return "CHECK", (f"{eq:.0%} equity is below the {strong:.0%} value line"
-                         f"{' and too many opponents to bluff' if opps >= 3 and drawing else ''}"
-                         f": check, keep the pot small"), None
+            return "CHECK", f"Draw ({outs} outs) but {where}: take the free card", None
+        return "CHECK", (f"{eq:.0%} equity is too low to bet: check"
+                         f"{' (too many opponents to bluff)' if opps >= 3 and drawing else ''}"), None
 
     # ---- facing a bet
     allin = stack is not None and call >= stack
@@ -93,26 +89,22 @@ def suggest_postflop(eq, pot, call, opps, stack=None, position="BTN", board=(), 
     if margin < -0.02:
         deep = stack is not None and stack >= 6 * call
         if drawing and deep and street < 5 and margin >= -0.08:
-            return "CALL", (f"short of the price ({eq:.0%} vs {req:.0%} needed) but you have {outs} outs and deep stacks: "
-                            f"implied odds - you win more when it hits"), None
-        return "FOLD", f"equity {eq:.0%} is below the {req:.0%} you need to call", None
+            return "CALL", (f"Slightly short ({eq:.0%} vs {req:.0%}), but {outs} outs and deep stacks: implied odds"), None
+        return "FOLD", f"{eq:.0%} equity, you need {req:.0%}: fold", None
     if not allin:
         raise_to = call * (3.0 if edge >= 0 else 3.5)
         commits = stack is not None and raise_to >= 0.6 * stack
         size = _size(raise_to, pot, stack) if not commits else f"all-in ({_chips(stack):,})"
         if wet and hold.get("made") == "Pair" and eq >= strong + 0.05:
-            return "CALL", (f"{eq:.0%} equity beats the {req:.0%} you need, but one pair on a board where someone "
-                            f"can have a straight or flush: call, don't raise - a raise is mostly called by hands that beat you"), None
+            return "CALL", (f"{eq:.0%} equity vs {req:.0%} needed. One pair on a straight/flush board: call, don't raise"), None
         if eq >= strong + 0.05:
-            return "RAISE", (f"{eq:.0%} equity is well ahead of what you need ({req:.0%}) and clears the "
-                             f"{strong:.0%} line ({where}): raise for value" +
-                             (" - low stack-to-pot ratio, so you're getting it in" if spr is not None and spr < 3 else "")), size
+            return "RAISE", (f"{eq:.0%} equity vs {req:.0%} needed: raise for value" +
+                             (" (short stacks, get it in)" if spr is not None and spr < 3 else "")), size
         if combo and opps == 1:
-            return "RAISE", (f"semi-bluff raise: {' + '.join(draws)} ({outs} outs) - strong draw, "
-                             f"fold equity plus {eq:.0%} when called"), size
+            return "RAISE", (f"semi-bluff raise: {' + '.join(draws)} ({outs} outs)"), size
     note = ""
     if spr is not None and spr > 6 and hold.get("made") in ("Pair", "High Card") and call > 0.5 * pot:
-        note = " Deep stacks and a one-pair hand against a big bet: be careful about putting in more."
+        note = " Deep stacks, one pair, big bet: be careful."
     if margin <= 0.02:
-        return "CALL", f"marginal: equity {eq:.0%} is about break-even ({req:.0%}).{note}", None
-    return "CALL", f"equity {eq:.0%} beats the {req:.0%} you need.{note}", None
+        return "CALL", f"Close call: {eq:.0%} equity vs {req:.0%} needed.{note}", None
+    return "CALL", f"{eq:.0%} equity vs {req:.0%} needed: call.{note}", None

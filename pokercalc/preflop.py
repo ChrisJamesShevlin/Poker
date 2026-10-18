@@ -173,15 +173,14 @@ def advise(hole, position, stack_bb, facing_raise, size_tier="normal", raise_bb=
         chart = _trim(OPEN[position], stack_bb) if position != "BB" else set()
         cheap = len(cls) == 2 or cls.endswith("s")
         if pct <= iso:
-            act, why = "RAISE", f"limpers ahead: strong hand (top {iso}%), raise to isolate and build the pot"
+            act, why = "RAISE", "Limpers ahead, strong hand: raise"
         elif cheap and (position == "BB" or cls in chart):
             act, why = "CALL" if position != "BB" else "CHECK", \
-                (f"limpers ahead: {'small pair' if len(cls) == 2 else 'suited hand'} - see a cheap flop and "
-                 f"{'hope to flop a set' if len(cls) == 2 else 'hope to flop a flush or straight'}, don't raise")
+                (f"Limpers ahead: {'small pair' if len(cls) == 2 else 'suited hand'}. See a cheap flop, don't raise")
         elif position == "BB":
-            act, why = "CHECK", "limpers ahead; you see a free flop"
+            act, why = "CHECK", "Limpers ahead: free flop"
         else:
-            act, why = "FOLD", "limpers ahead and this hand is too weak to play out of position or in a crowd"
+            act, why = "FOLD", "Limpers ahead, hand too weak: fold"
     elif not facing_raise:
         if position == "BB":
             act, why = "CHECK", "nobody raised; you see a free flop"

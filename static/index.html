@@ -100,14 +100,14 @@ dialog .field{margin-bottom:10px}
       <div class="row" id="boardRow"></div>
     </div>
     <div class="picker" id="picker"></div>
-    <div class="hint">Click cards, or type them: rank + suit (e.g. <b>a</b> <b>h</b>, <b>t</b> <b>s</b>). Backspace = undo, Esc = clear.<br>Keys: <b>p</b> pot &middot; <b>b</b> bet to call &middot; <b>[</b> <b>]</b> fewer/more opponents &middot; <b>Enter</b> moves to the next box, or saves the hand.</div>
+    <div class="hint">Click cards or type them: rank then suit (<b>a</b> <b>h</b>). <b>p</b> pot &middot; <b>b</b> bet to call &middot; Backspace undo &middot; Esc clear</div>
     <div class="card" style="margin-top:12px">
       <div class="log" style="margin:0;padding:0;border:0">
-        <div class="lbl" style="text-align:left;margin-top:0">What did you do? Tap it to log it and move on</div>
+        <div class="lbl" style="text-align:left;margin-top:0">What did you do?</div>
         <div class="seg" id="takenSeg"></div>
-        <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="How much? (total chips you put in)"><button class="btn" id="amtOk">Confirm</button></div>
+        <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="Amount"><button class="btn" id="amtOk">Confirm</button></div>
         <div class="logrow">
-          <input id="result" type="number" inputmode="numeric" placeholder="Net chips won/lost (optional, e.g. -400)">
+          <input id="result" type="number" inputmode="numeric" placeholder="Result, e.g. -400 (optional)">
           <button class="btn" id="saveBtn">Save &amp; next</button>
           <button class="btn ghost" id="clearBtn">Clear</button>
         </div>
@@ -133,23 +133,23 @@ dialog .field{margin-bottom:10px}
 
     <div class="card" style="margin-top:12px">
       <div class="controls">
-        <div class="field"><label>Pot (add the bet in front of them if the table shows it separately)</label><input id="pot" type="number" inputmode="numeric" min="0"></div>
-        <div class="field"><label>Bet to call (0 = nobody has bet, so you can check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
-        <div class="field wide" id="betWrap"><label>Their bet, as a share of the pot (fills in Bet to call)</label><div class="seg" id="betSeg"></div></div>
-        <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
+        <div class="field"><label>Pot (include their bet)</label><input id="pot" type="number" inputmode="numeric" min="0"></div>
+        <div class="field"><label>Bet to call (0 = check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
+        <div class="field wide" id="betWrap"><label>Their bet size</label><div class="seg" id="betSeg"></div></div>
+        <div class="field wide"><label>Opponents</label><div class="seg" id="oppSeg"></div></div>
         <div class="field wide"><label id="posLbl">Seat</label><div class="seg" id="posSeg"></div></div>
-        <div class="field wide"><label>Players at the table (set once - 2 to 9, tournaments too)</label><div class="seg" id="sizeSeg"></div></div>
-        <div class="field"><label>Big blind (for raise amounts)</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
+        <div class="field wide"><label>Table size</label><div class="seg" id="sizeSeg"></div></div>
+        <div class="field"><label>Big blind</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
-        <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
-        <details class="field wide more"><summary>More options (the defaults are fine)</summary>
+        <div class="field" id="facingWrap"><label>Before the flop</label><div class="seg" id="facingSeg"></div></div>
+        <details class="field wide more"><summary>More options</summary>
         <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
         <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
         <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
         </details>
       </div>
     </div>
-    <div class="foot">Knows nothing about how your opponents play. Not a GTO solver. Simple rules of thumb for study only, play-money tables.</div>
+    <div class="foot">Rules of thumb for study. Knows nothing about how your opponents play.</div>
   </div>
  </div>
 </section>
@@ -218,7 +218,7 @@ function buildBetSeg(){  // pot field is the TOTAL in the middle (bet included),
     el.appendChild(b);
   });
 }
-function updSeat(){$('posLbl').textContent='Seat: '+pos+'  (set it once; it moves on after each saved hand. Tap Seat to step through UTG / HJ / CO)'}
+function updSeat(){$('posLbl').textContent='Seat: '+pos}
 function buildControls(){
   seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
   seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
@@ -329,8 +329,8 @@ async function calc(){
 function show(d,s){
   $('empty').classList.add('hidden');$('out').classList.remove('hidden');
   $('action').textContent=d.action;$('action').className='action a-'+d.action;
-  $('why').textContent=d.why+(d.action==='BET'?' (Nobody has bet yet. Many sites label this button "Raise".)':'');
-  $('sizing').textContent=d.sizing?'Suggested size: '+d.sizing:'';$('sizing').classList.toggle('hidden',!d.sizing);
+  $('why').textContent=d.why+(d.action==='BET'?' (Your site may call this "Raise".)':'');
+  $('sizing').textContent=d.sizing?'Size: '+d.sizing:'';$('sizing').classList.toggle('hidden',!d.sizing);
   $('eqTxt').textContent=(d.equity*100).toFixed(1)+'% equity';
   $('eqBar').style.width=(d.equity*100)+'%';
   const showReq=s.call>0;
@@ -352,7 +352,7 @@ function show(d,s){
   if(d.stack_line)kv.push(['Stack',d.stack_line.replace(/^Stack /,'')]);
   if(d.preflop){if(d.preflop.size)kv.push(['Raise size',d.preflop.size]);kv.push(['Preflop',d.preflop.text]);if(d.preflop.note)kv.push(['Note',d.preflop.note])}
   $('kv').innerHTML=kv.map(([k,v])=>`<li><span class="k">${k}</span>${v}</li>`).join('');
-  $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - try Auto or a Top % range.':'';
+  $('warn').textContent=d.random_warning?'Random hands makes this look too good. Use Auto.':'';
 }
 
 /* ---------- logging what you did: updates pot and stack for you, then waits for the next card/bet ---------- */
@@ -379,9 +379,9 @@ async function commit(a,amt){
   waiting=true;
   $('out').classList.add('hidden');$('empty').classList.remove('hidden');
   const verb={CHECK:'checked',CALL:'called',BET:'bet',RAISE:'raised to'}[a];
-  $('empty').innerHTML=`<b style="color:var(--text)">You ${verb}${amt?' '+amt.toLocaleString():''}.</b> Pot is now ${(+$('pot').value||0).toLocaleString()}`+
-    ($('stack').value?`, your stack ${(+$('stack').value).toLocaleString()}`:'')+
-    `.<br><br>Next: tap the next card, or type their bet to get new advice.<br>Hand finished? Enter your result below and press Save &amp; next.`;
+  $('empty').innerHTML=`<b style="color:var(--text)">You ${verb}${amt?' '+amt.toLocaleString():''}.</b> Pot ${(+$('pot').value||0).toLocaleString()}`+
+    ($('stack').value?`, stack ${(+$('stack').value).toLocaleString()}`:'')+
+    `.<br><br>Next: add a card or their bet. Hand over? Press Save &amp; next.`;
 }
 function confirmAmt(){const v=+$('amt').value;if(!v)return;commit(pendingAct,v)}
 $('amtOk').onclick=confirmAmt;
