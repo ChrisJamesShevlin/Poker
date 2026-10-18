@@ -69,6 +69,7 @@ input:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .log{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .log .seg{margin-bottom:8px}
 .btn{background:var(--blue);border:0;color:#fff;padding:10px 16px;border-radius:9px;font:inherit;font-weight:650;cursor:pointer}
+.btn.won{background:var(--good);color:#04210f}.btn.lost{background:var(--bad)}
 .btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
 .logrow{display:flex;gap:8px}
 .logrow input{flex:1}
@@ -107,8 +108,9 @@ dialog .field{margin-bottom:10px}
         <div class="seg" id="takenSeg"></div>
         <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="Amount"><button class="btn" id="amtOk">Confirm</button></div>
         <div class="logrow">
-          <input id="result" type="number" inputmode="numeric" placeholder="Result, e.g. -400 (optional)">
-          <button class="btn" id="saveBtn">Save &amp; next</button>
+          <input id="result" type="number" inputmode="numeric" min="0" placeholder="Amount">
+          <button class="btn won" id="wonBtn">Won</button>
+          <button class="btn lost" id="lostBtn">Lost</button>
           <button class="btn ghost" id="clearBtn">Clear</button>
         </div>
       </div>
@@ -375,25 +377,25 @@ async function commit(a,amt){
     if($('stack').value){const ns=Math.max(0,+$('stack').value-amt);$('stack').value=ns;store.set('stack',ns)}
   }
   $('call').value=0;
-  if(a==='FOLD'){await save();return}
+  if(a==='FOLD'){await save(-contrib);return}   // folding loses what you put in
   waiting=true;
   $('out').classList.add('hidden');$('empty').classList.remove('hidden');
   const verb={CHECK:'checked',CALL:'called',BET:'bet',RAISE:'raised to'}[a];
   $('empty').innerHTML=`<b style="color:var(--text)">You ${verb}${amt?' '+amt.toLocaleString():''}.</b> Pot ${(+$('pot').value||0).toLocaleString()}`+
     ($('stack').value?`, stack ${(+$('stack').value).toLocaleString()}`:'')+
-    `.<br><br>Next: add a card or their bet. Hand over? Press Save &amp; next.`;
+    `.<br><br>Next: add a card or their bet. Hand over? Enter the amount, then Won or Lost.`;
 }
 function confirmAmt(){const v=+$('amt').value;if(!v)return;commit(pendingAct,v)}
 $('amtOk').onclick=confirmAmt;
 function prefillPot(){const bb=session?session.bb:(+$('bbIn').value||0);if(bb&&!$('pot').value)$('pot').value=bb*1.5}  // both blinds are in before you act
 
 /* ---------- save / clear ---------- */
-async function save(){
+async function save(res){   // res = chips won (+) or lost (-) this hand
   if(!last)return;
   const b={...last.s,range_pct:last.d.range_pct_used,equity:last.d.equity,required:last.d.required,suggested:last.d.action,
-           taken,result:$('result').value};
+           taken,result:res==null?'':res};
   await fetch('/api/hand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
-  if($('result').value!==''&&startStack!==null){const ns=startStack+(+$('result').value);$('stack').value=ns;store.set('stack',ns)}
+  if(res!=null&&startStack!==null){const ns=startStack+res;$('stack').value=ns;store.set('stack',ns)}
   const order=SEATS[tableSize];
   seatIdx=(seatIdx+1)%order.length; pos=order[seatIdx]; store.set('seat',seatIdx); store.set('pos',pos);   // the button moves on
   clearHand(); toast('Saved - next seat: '+pos);
@@ -415,7 +417,7 @@ document.addEventListener('keydown',e=>{
   const t=e.target;
   if(t.tagName==='INPUT'&&e.key==='Enter'&&!$('sessDlg').open){
     e.preventDefault();
-    if(t.id==='result'){save();t.blur();return}
+    if(t.id==='result'){t.blur();return}
     if(t.id==='amt'){confirmAmt();return}
     const i=FLOW.indexOf(t.id);
     if(i>=0&&i<FLOW.length-1){$(FLOW[i+1]).focus();$(FLOW[i+1]).select()}else t.blur();
@@ -424,7 +426,6 @@ document.addEventListener('keydown',e=>{
   if($('sessDlg').open||!$('hand').offsetParent)return;
   const k=e.key.toLowerCase();
   if(k==='escape'){clearHand(true);return}
-  if(k==='enter'){if(t.tagName!=='BUTTON'&&last){e.preventDefault();save()}return}
   if(k==='backspace'){e.preventDefault();
     if(pendingRank){pendingRank=null;return}
     for(let i=6;i>=0;i--)if(slots[i]){slots[i]=null;compact();renderAll();schedule();break}return}
@@ -481,7 +482,14 @@ $('bbIn').value=store.get('bb','');$('stack').value=store.get('stack','');
   if(id==='stack'){store.set('stack',$(id).value);if(startStack!==null)startStack=(+$(id).value||0)+contrib}
   else waiting=false;
   schedule()}));  // typing must recalculate, not just the buttons
-$('saveBtn').onclick=save;$('clearBtn').onclick=()=>clearHand(true);
+function finish(sign){
+  if(!last){toast('Pick your cards first');return}
+  let v=Math.abs(+$('result').value||0);
+  if(!v&&sign<0)v=contrib;          // 'Lost' with no amount = what you put in
+  if(!v){$('result').focus();return}
+  save(sign*v);
+}
+$('wonBtn').onclick=()=>finish(1);$('lostBtn').onclick=()=>finish(-1);$('clearBtn').onclick=()=>clearHand(true);
 buildControls();renderAll();loadSession().then(()=>{prefillPot();renderAll();schedule()});
 </script>
 </body>
