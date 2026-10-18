@@ -102,7 +102,9 @@ dialog .field{margin-bottom:10px}
     <div class="hint">Click cards, or type them: rank + suit (e.g. <b>a</b> <b>h</b>, <b>t</b> <b>s</b>). Backspace = undo, Esc = clear.<br>Keys: <b>p</b> pot &middot; <b>b</b> bet to call &middot; <b>[</b> <b>]</b> fewer/more opponents &middot; <b>Enter</b> moves to the next box, or saves the hand.</div>
     <div class="card" style="margin-top:12px">
       <div class="log" style="margin:0;padding:0;border:0">
+        <div class="lbl" style="text-align:left;margin-top:0">What did you do? Tap it to log it and move on</div>
         <div class="seg" id="takenSeg"></div>
+        <div class="logrow hidden" id="amtRow" style="margin:8px 0"><input id="amt" type="number" inputmode="numeric" placeholder="How much? (total chips you put in)"><button class="btn" id="amtOk">Confirm</button></div>
         <div class="logrow">
           <input id="result" type="number" inputmode="numeric" placeholder="Net chips won/lost (optional, e.g. -400)">
           <button class="btn" id="saveBtn">Save &amp; next</button>
@@ -187,6 +189,7 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON
 
 let slots=Array(7).fill(null);          // 0,1 hole; 2..6 board
 let opps=store.get('opps',2), rangePct=store.get('range','auto'), table=store.get('table','normal'), raiser='', multi=false, pos=store.get('pos','BTN');
+let waiting=false, startStack=null, contrib=0, pendingAct=null;
 let facing=false, taken=null, last=null, pendingRank=null, reqId=0, timer=null, session=null;
 
 /* ---------- segmented controls ---------- */
@@ -203,7 +206,7 @@ function buildBetSeg(){  // pot field is the TOTAL in the middle (bet included),
   const el=$('betSeg'); el.innerHTML='';
   BETS.forEach(([label,f])=>{
     const b=document.createElement('button'); b.textContent=label;
-    b.onclick=()=>{const P=+$('pot').value||0; if(!P&&f)return $('pot').focus();
+    b.onclick=()=>{waiting=false; const P=+$('pot').value||0; if(!P&&f)return $('pot').focus();
       $('call').value=f?Math.round(P*f/(1+f)):0; schedule()};
     el.appendChild(b);
   });
@@ -217,7 +220,14 @@ function buildControls(){
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
   seg('facingSeg',[['No raise yet',false],['Limpers',"limp"],['Facing a raise',true]],()=>facing,v=>facing=v);
-  seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
+  buildTaken();
+}
+function buildTaken(){
+  const el=$('takenSeg'); el.innerHTML='';
+  ['FOLD','CHECK','CALL','BET','RAISE'].forEach(a=>{
+    const b=document.createElement('button'); b.textContent=a; b.className=taken===a?'on':'';
+    b.onclick=()=>act(a); el.appendChild(b);
+  });
 }
 
 /* ---------- cards ---------- */
@@ -262,6 +272,7 @@ function compact(){ // keep hole cards first, board cards contiguous
   slots=[...hole,...Array(2-hole.length).fill(null),...board,...Array(5-board.length).fill(null)];
 }
 function toggle(code){
+  waiting=false;
   const i=slots.indexOf(code);
   if(i>=0){slots[i]=null;compact()}
   else{const j=slots.findIndex(x=>!x); if(j<0)return; slots[j]=code}
@@ -277,6 +288,7 @@ function state(){
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(calc,120)}
 async function calc(){
+  if(waiting)return;
   const s=state(), ok=s.hole.length===2&&[0,3,4,5].includes(s.board.length);
   if(!ok){
     $('out').classList.add('hidden');$('empty').classList.remove('hidden');
@@ -288,7 +300,7 @@ async function calc(){
   const r=await fetch('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
   if(id!==reqId)return;
   const d=await r.json(); if(d.error)return;
-  last={s,d}; taken=d.action; seg('takenSeg',['FOLD','CHECK','CALL','BET','RAISE'].map(a=>[a,a]),()=>taken,v=>taken=v);
+  last={s,d}; taken=d.action; buildTaken();
   show(d,s);
 }
 function show(d,s){
@@ -320,17 +332,52 @@ function show(d,s){
   $('warn').textContent=d.random_warning?'Equity vs random hands is optimistic - try Auto or a Top % range.':'';
 }
 
+/* ---------- logging what you did: updates pot and stack for you, then waits for the next card/bet ---------- */
+function suggestedAmount(){
+  const m=last&&last.d.sizing&&last.d.sizing.match(/(?:~|all-in \()([\d,]+)\b(?!\.\d)/);
+  return m?m[1].replace(/,/g,''):'';
+}
+function act(a){
+  if(!last)return;
+  taken=a;buildTaken();
+  if(a==='BET'||a==='RAISE'){pendingAct=a;$('amtRow').classList.remove('hidden');$('amt').value=suggestedAmount();$('amt').focus();$('amt').select();return}
+  $('amtRow').classList.add('hidden');
+  commit(a,a==='CALL'?(+$('call').value||0):0);
+}
+async function commit(a,amt){
+  $('amtRow').classList.add('hidden');
+  if(startStack===null&&$('stack').value)startStack=+$('stack').value;
+  if(amt){
+    $('pot').value=(+$('pot').value||0)+amt;contrib+=amt;
+    if($('stack').value){const ns=Math.max(0,+$('stack').value-amt);$('stack').value=ns;store.set('stack',ns)}
+  }
+  $('call').value=0;
+  if(a==='FOLD'){await save();return}
+  waiting=true;
+  $('out').classList.add('hidden');$('empty').classList.remove('hidden');
+  const verb={CHECK:'checked',CALL:'called',BET:'bet',RAISE:'raised to'}[a];
+  $('empty').innerHTML=`<b style="color:var(--text)">You ${verb}${amt?' '+amt.toLocaleString():''}.</b> Pot is now ${(+$('pot').value||0).toLocaleString()}`+
+    ($('stack').value?`, your stack ${(+$('stack').value).toLocaleString()}`:'')+
+    `.<br><br>Next: tap the next card, or type their bet to get new advice.<br>Hand finished? Enter your result below and press Save &amp; next.`;
+}
+function confirmAmt(){const v=+$('amt').value;if(!v)return;commit(pendingAct,v)}
+$('amtOk').onclick=confirmAmt;
+function prefillPot(){const bb=session?session.bb:(+$('bbIn').value||0);if(bb&&!$('pot').value)$('pot').value=bb*1.5}  // both blinds are in before you act
+
 /* ---------- save / clear ---------- */
 async function save(){
   if(!last)return;
   const b={...last.s,range_pct:last.d.range_pct_used,equity:last.d.equity,required:last.d.required,suggested:last.d.action,
            taken,result:$('result').value};
   await fetch('/api/hand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  if($('result').value!==''&&startStack!==null){const ns=startStack+(+$('result').value);$('stack').value=ns;store.set('stack',ns)}
   clearHand(); toast('Saved');
 }
-function clearHand(){
+function clearHand(discard){
+  if(discard&&startStack!==null){$('stack').value=startStack;store.set('stack',startStack)}  // abandoned hand: put the chips back
+  waiting=false;startStack=null;contrib=0;$('amtRow').classList.add('hidden');
   slots=Array(7).fill(null);$('pot').value='';$('call').value='0';$('result').value='';
-  facing=false;raiser='';multi=false;taken=null;last=null;buildControls();renderAll();schedule();
+  facing=false;raiser='';multi=false;taken=null;last=null;buildControls();renderAll();prefillPot();schedule();
 }
 function toast(t){const e=document.createElement('div');e.textContent=t;
   Object.assign(e.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',background:'#22c55e',color:'#04210f',padding:'8px 16px',borderRadius:'8px',fontWeight:'700'});
@@ -344,13 +391,14 @@ document.addEventListener('keydown',e=>{
   if(t.tagName==='INPUT'&&e.key==='Enter'&&!$('sessDlg').open){
     e.preventDefault();
     if(t.id==='result'){save();t.blur();return}
+    if(t.id==='amt'){confirmAmt();return}
     const i=FLOW.indexOf(t.id);
     if(i>=0&&i<FLOW.length-1){$(FLOW[i+1]).focus();$(FLOW[i+1]).select()}else t.blur();
     return}
   if(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||e.ctrlKey||e.metaKey||e.altKey)return;
   if($('sessDlg').open||!$('hand').offsetParent)return;
   const k=e.key.toLowerCase();
-  if(k==='escape'){clearHand();return}
+  if(k==='escape'){clearHand(true);return}
   if(k==='enter'){if(t.tagName!=='BUTTON'&&last){e.preventDefault();save()}return}
   if(k==='backspace'){e.preventDefault();
     if(pendingRank){pendingRank=null;return}
@@ -402,10 +450,14 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.tab==='analytics')loadAnalytics();
 });
 
-$('bbIn').value=store.get('bb','');
-['pot','call','stack','bbIn'].forEach(id=>$(id).addEventListener('input',()=>{if(id==='bbIn')store.set('bb',$(id).value);schedule()}));  // typing must recalculate, not just the buttons
-$('saveBtn').onclick=save;$('clearBtn').onclick=clearHand;
-buildControls();renderAll();loadSession();
+$('bbIn').value=store.get('bb','');$('stack').value=store.get('stack','');
+['pot','call','stack','bbIn'].forEach(id=>$(id).addEventListener('input',()=>{
+  if(id==='bbIn'){store.set('bb',$(id).value);prefillPot()}
+  if(id==='stack'){store.set('stack',$(id).value);if(startStack!==null)startStack=(+$(id).value||0)+contrib}
+  else waiting=false;
+  schedule()}));  // typing must recalculate, not just the buttons
+$('saveBtn').onclick=save;$('clearBtn').onclick=()=>clearHand(true);
+buildControls();renderAll();loadSession().then(()=>{prefillPot();schedule()});
 </script>
 </body>
 </html>
