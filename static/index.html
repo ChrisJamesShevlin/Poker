@@ -76,6 +76,7 @@ dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);bo
 dialog::backdrop{background:#000a}
 dialog .field{margin-bottom:10px}
 .hidden{display:none}
+.more summary{cursor:pointer;color:var(--dim);font-size:12.5px}.more[open] summary{margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -136,13 +137,15 @@ dialog .field{margin-bottom:10px}
         <div class="field"><label>Bet to call (0 = nobody has bet, so you can check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
         <div class="field wide" id="betWrap"><label>Their bet, as a share of the pot (fills in Bet to call)</label><div class="seg" id="betSeg"></div></div>
         <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
-        <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
-        <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
-        <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
         <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
         <div class="field"><label>Big blind (for raise amounts)</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
         <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
+        <details class="field wide more"><summary>More options (the defaults are fine)</summary>
+        <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
+        <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
+        <div class="field wide" id="multiWrap"><label>Their betting</label><div class="seg" id="multiSeg"></div></div>
+        </details>
       </div>
     </div>
     <div class="foot">Knows nothing about how your opponents play. Not a GTO solver. Simple rules of thumb for study only, play-money tables.</div>
