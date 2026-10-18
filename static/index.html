@@ -306,7 +306,7 @@ async function calc(){
 function show(d,s){
   $('empty').classList.add('hidden');$('out').classList.remove('hidden');
   $('action').textContent=d.action;$('action').className='action a-'+d.action;
-  $('why').textContent=d.why;
+  $('why').textContent=d.why+(d.action==='BET'?' (Nobody has bet yet. Many sites label this button "Raise".)':'');
   $('sizing').textContent=d.sizing?'Suggested size: '+d.sizing:'';$('sizing').classList.toggle('hidden',!d.sizing);
   $('eqTxt').textContent=(d.equity*100).toFixed(1)+'% equity';
   $('eqBar').style.width=(d.equity*100)+'%';
