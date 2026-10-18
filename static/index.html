@@ -137,7 +137,8 @@ dialog .field{margin-bottom:10px}
         <div class="field"><label>Bet to call (0 = nobody has bet, so you can check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
         <div class="field wide" id="betWrap"><label>Their bet, as a share of the pot (fills in Bet to call)</label><div class="seg" id="betSeg"></div></div>
         <div class="field wide"><label>Opponents in hand</label><div class="seg" id="oppSeg"></div></div>
-        <div class="field wide"><label>Your position</label><div class="seg" id="posSeg"></div></div>
+        <div class="field wide"><label>Your position (moves one seat after each saved hand)</label><div class="seg" id="posSeg"></div></div>
+        <div class="field wide"><label>Players at the table (set once)</label><div class="seg" id="sizeSeg"></div></div>
         <div class="field"><label>Big blind (for raise amounts)</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
         <div class="field" id="facingWrap"><label>Preflop</label><div class="seg" id="facingSeg"></div></div>
@@ -182,6 +183,7 @@ dialog .field{margin-bottom:10px}
 const RANKS=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
 const SUITS=[['s','♠'],['h','♥'],['d','♦'],['c','♣']];
 const POS=['UTG','HJ','CO','BTN','SB','BB'];
+const SEATS={6:['BTN','SB','BB','UTG','HJ','CO'],5:['BTN','SB','BB','UTG','CO']};  // order the dealer button moves your seat each hand
 const RANGES=[['Auto','auto'],['Random',0],['Top 40%',40],['Top 25%',25],['Top 15%',15]];
 const TABLES=[['Loose','loose'],['Normal','normal'],['Tight','tight']];
 const RAISERS=[['None',''],['UTG','UTG'],['HJ','HJ'],['CO','CO'],['BTN','BTN'],['SB','SB']];
@@ -190,7 +192,7 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 let slots=Array(7).fill(null);          // 0,1 hole; 2..6 board
-let opps=store.get('opps',2), rangePct=store.get('range','auto'), table=store.get('table','normal'), raiser='', multi=false, pos=store.get('pos','BTN');
+let tableSize=store.get('tsize',6), opps=store.get('opps',2), rangePct=store.get('range','auto'), table=store.get('table','normal'), raiser='', multi=false, pos=store.get('pos','BTN');
 let waiting=false, startStack=null, contrib=0, pendingAct=null;
 let facing=false, taken=null, last=null, pendingRank=null, reqId=0, timer=null, session=null;
 
@@ -220,6 +222,7 @@ function buildControls(){
   seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   seg('posSeg',POS.map(p=>[p,p]),()=>pos,v=>{pos=v;store.set('pos',v)});
+  seg('sizeSeg',[['5 players',5],['6 players',6]],()=>tableSize,v=>{tableSize=v;store.set('tsize',v)});
   seg('facingSeg',[['No raise yet',false],['Limpers',"limp"],['Facing a raise',true]],()=>facing,v=>facing=v);
   buildTaken();
 }
@@ -373,7 +376,9 @@ async function save(){
            taken,result:$('result').value};
   await fetch('/api/hand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   if($('result').value!==''&&startStack!==null){const ns=startStack+(+$('result').value);$('stack').value=ns;store.set('stack',ns)}
-  clearHand(); toast('Saved');
+  const order=SEATS[tableSize]||SEATS[6], i=order.indexOf(pos);
+  pos=order[(i+1)%order.length]; store.set('pos',pos);   // the button moves on
+  clearHand(); toast('Saved - next seat: '+pos);
 }
 function clearHand(discard){
   if(discard&&startStack!==null){$('stack').value=startStack;store.set('stack',startStack)}  // abandoned hand: put the chips back
