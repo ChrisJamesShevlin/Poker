@@ -144,6 +144,7 @@ dialog .field{margin-bottom:10px}
         <div class="field"><label>Big blind</label><input id="bbIn" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Your stack</label><input id="stack" type="number" inputmode="numeric" min="0"></div>
         <div class="field" id="facingWrap"><label>Before the flop</label><div class="seg" id="facingSeg"></div></div>
+        <div class="field wide"><button class="btn ghost" id="resetNums" style="padding:6px 12px;font-size:13px">Reset pot, blind &amp; stack</button></div>
         <details class="field wide more"><summary>More options</summary>
         <div class="field wide"><label>Their range</label><div class="seg" id="rangeSeg"></div></div>
         <div class="field wide"><label>Table type</label><div class="seg" id="tableSeg"></div></div>
@@ -490,6 +491,7 @@ function finish(sign){
   const res=sign>0?(typed||+$('pot').value||0)-contrib:-(typed||contrib);
   save(res);
 }
+$('resetNums').onclick=()=>{['pot','bbIn','stack'].forEach(id=>$(id).value='');store.set('bb','');store.set('stack','');startStack=null;contrib=0;waiting=false;renderAll();schedule()};
 $('wonBtn').onclick=()=>finish(1);$('lostBtn').onclick=()=>finish(-1);$('clearBtn').onclick=()=>clearHand(true);
 buildControls();renderAll();loadSession().then(()=>{prefillPot();renderAll();schedule()});
 </script>
