@@ -137,7 +137,6 @@ dialog .field{margin-bottom:10px}
       <div class="controls">
         <div class="field"><label>Pot (include their bet)</label><input id="pot" type="number" inputmode="numeric" min="0"></div>
         <div class="field"><label>Bet to call (0 = check)</label><input id="call" type="number" inputmode="numeric" min="0" value="0"></div>
-        <div class="field wide" id="betWrap"><label>Their bet size</label><div class="seg" id="betSeg"></div></div>
         <div class="field wide"><label>Opponents</label><div class="seg" id="oppSeg"></div></div>
         <div class="field wide"><label id="posLbl">Seat</label><div class="seg" id="posSeg"></div></div>
         <div class="field wide"><label>Table size</label><div class="seg" id="sizeSeg"></div></div>
@@ -211,21 +210,10 @@ function seg(id,items,get,set){
     el.appendChild(b);
   });
 }
-const BETS=[['No bet',0],['\u2153 pot',1/3],['\u00BD pot',.5],['\u2154 pot',2/3],['Pot',1],['1.5x',1.5]];
-function buildBetSeg(){  // pot field is the TOTAL in the middle (bet included), so bet = f*pot/(1+f)
-  const el=$('betSeg'); el.innerHTML='';
-  BETS.forEach(([label,f])=>{
-    const b=document.createElement('button'); b.textContent=label;
-    b.onclick=()=>{waiting=false; const P=+$('pot').value||0; if(!P&&f)return $('pot').focus();
-      $('call').value=f?Math.round(P*f/(1+f)):0; schedule()};
-    el.appendChild(b);
-  });
-}
 function updSeat(){$('posLbl').textContent='Seat: '+pos}
 function buildControls(){
   seg('oppSeg',[1,2,3,4,5,6].map(n=>[n,n]),()=>opps,v=>{opps=v;store.set('opps',v)});
   seg('rangeSeg',RANGES,()=>rangePct,v=>{rangePct=v;store.set('range',v)});
-  buildBetSeg();
   seg('tableSeg',TABLES,()=>table,v=>{table=v;store.set('table',v)});
   seg('multiSeg',[['Just this street',false],['Bet earlier streets too',true]],()=>multi,v=>multi=v);
   // 'Seat' = any seat between the big blind and the button (UTG/HJ/CO); click it to step through them
@@ -304,7 +292,7 @@ function toggle(code){
   renderAll();schedule();
 }
 function bbKnown(){return !!(session?session.bb:(+$('bbIn').value||0))}  // with the big blind known, raises and limpers are read from the pot and bet
-function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0||bbKnown());$('multiWrap').classList.toggle('hidden',nb<4);$('betWrap').classList.toggle('hidden',nb<3)}
+function renderAll(){renderSlots();const nb=slots.slice(2).filter(Boolean).length;$('facingWrap').classList.toggle('hidden',nb>0||bbKnown());$('multiWrap').classList.toggle('hidden',nb<4)}
 
 /* ---------- calculation ---------- */
 function state(){
